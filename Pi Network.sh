@@ -31,7 +31,6 @@ SILENT_MODE=true
 SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
 
 log_info() {
-
     echo -e "${NC}$1"
 }
 
@@ -198,7 +197,7 @@ install_frps() {
         return 1
     fi
     echo -e "${BLUE}» 安装 FRPS 可执行文件...${NC}"
-    cd "${FRP_NAME}" 
+    cd "${FRP_NAME}"
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ 无法进入 FRP 目录！${NC}"
         return 1
@@ -312,9 +311,6 @@ cleanup() {
 }
 
 uninstall_all() {
-    echo -e "${YELLOW}╔═════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║               卸载所有服务                      ║${NC}"
-    echo -e "${YELLOW}╚═════════════════════════════════════════════════╝${NC}"
     echo -e "${BLUE}» 停止并卸载 VPN 服务...${NC}"
     systemctl stop vpn >/dev/null 2>&1
     systemctl disable vpn >/dev/null 2>&1
@@ -333,28 +329,22 @@ uninstall_all() {
 }
 
 show_results() {
-    echo -e "${YELLOW}╔═════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║               服务信息摘要                      ║${NC}"
-    echo -e "${YELLOW}╚═════════════════════════════════════════════════╝${NC}"
-    echo -e "${WHITE}${BOLD}▎ FRPS 服务信息${NC}"
+    local vpn_status=$(systemctl is-active vpn 2>/dev/null || echo "inactive")
+    local frps_status=$(systemctl is-active frps 2>/dev/null || echo "inactive")
     SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
-    local frps_status=$(systemctl status frps --no-pager | grep -E 'Active:' | sed 's/^\s*Active: //g')
-    echo -e "  ${BOLD}• 服务状态:${NC}   ${WHITE}${frps_status}${NC}"
-    echo -e "  ${BOLD}• 服务器地址:${NC}   ${WHITE}${SERVER_IP}${NC}"
-    echo -e "  ${BOLD}• FRPS 端口:${NC}    ${WHITE}${FRPS_PORT}${NC}"
-    echo -e "  ${BOLD}• FRPS 令牌:${NC}    ${WHITE}${FRPS_TOKEN}${NC}"
-    echo -e "  ${BOLD}• Web 管理界面:${NC} ${WHITE}http://${SERVER_IP}:${FRPS_DASHBOARD_PORT}${NC}"
-    if systemctl is-active vpn >/dev/null 2>&1; then
-        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${WHITE}${BOLD}▎ SoftEtherVPN 服务信息${NC}"
-        local vpn_status=$(systemctl status vpn --no-pager | grep -E 'Active:' | sed 's/^\s*Active: //g')
-        echo -e "  ${BOLD}• 服务状态:${NC}   ${WHITE}${vpn_status}${NC}"
-        echo -e "  ${BOLD}• 服务器地址:${NC} ${WHITE}${SERVER_IP}${NC}"
-        echo -e "  ${BOLD}• VPN Hub:${NC}    ${WHITE}${VPN_HUB}${NC}"
-        echo -e "  ${BOLD}• VPN 用户名:${NC} ${WHITE}${VPN_USER}${NC}"
-        echo -e "  ${BOLD}• VPN 密码:${NC}   ${WHITE}${VPN_PASSWORD}${NC}"
-        echo -e "  ${BOLD}• 管理密码:${NC}   ${WHITE}${ADMIN_PASSWORD}${NC}"
-    fi
+    echo -e "${YELLOW}>>> SoftEtherVPN & FRPS${NC}${WHITE}服务状态:${NC}"
+    echo -e "SoftEtherVPN: ${WHITE}${vpn_status}${NC}"
+    echo -e "FRPS: ${WHITE}${frps_status}${NC}"
+    echo -e "${YELLOW}>>> VPN${NC}${WHITE}信息:${NC}"
+    echo -e "服务器地址: ${WHITE}${SERVER_IP}${NC}"
+    echo -e "VPN Hub: ${WHITE}${VPN_HUB}${NC}"
+    echo -e "VPN 用户名: ${WHITE}${VPN_USER}${NC}"
+    echo -e "VPN 密码: ${WHITE}${VPN_PASSWORD}${NC}"
+    echo -e "VPN 管理密码: ${WHITE}${ADMIN_PASSWORD}${NC}"
+    echo -e "${YELLOW}>>> FRPS${NC}${WHITE}信息:${NC}"
+    echo -e "FRPS 端口: ${WHITE}${FRPS_PORT}${NC}"
+    echo -e "FRPS 令牌: ${WHITE}${FRPS_TOKEN}${NC}"
+    echo -e "FRPS 管理界面: ${WHITE}http://${SERVER_IP}:${FRPS_DASHBOARD_PORT}${NC}"
 }
 
 install_frp_only() {
@@ -394,13 +384,12 @@ install_softether_and_frps() {
 
 show_menu() {
     echo -e "${YELLOW}╔═════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}║               Pi Network 管理面板              ║${NC}"
+    echo -e "${YELLOW}║                   PiNetwork                     ║${NC}"
     echo -e "${YELLOW}╚═════════════════════════════════════════════════╝${NC}"
     echo -e "${LIGHT_GREEN}请选择要执行的操作:${NC}"
     echo -e "  ${BLUE}1)${NC} 安装 SoftEtherVPN和FRPS服务"
     echo -e "  ${BLUE}2)${NC} 卸载所有服务" 
     echo -e "  ${BLUE}3)${NC} 退出脚本"
-    echo -e "${YELLOW}═════════════════════════════════════════════════${NC}"
     echo -n "请输入选项 [1-3]: "
     read -r choice
     case "$choice" in

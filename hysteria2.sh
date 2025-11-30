@@ -42,6 +42,51 @@ check_root() {
     fi
 }
 
+check_system() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+        ID_LIKE=${ID_LIKE:-""}
+        VERSION_ID=${VERSION_ID:-""}
+    elif [ -f /etc/redhat-release ]; then
+        OS="centos"
+        VERSION_ID=$(cat /etc/redhat-release | grep -oE '[0-9]+' | head -1)
+    else
+        exit 1
+    fi
+
+    if [[ "$ID_LIKE" == *"centos"* ]] || [[ "$ID_LIKE" == *"rhel"* ]] || [[ "$ID_LIKE" == *"fedora"* ]]; then
+        exit 1
+    fi
+
+    case $OS in
+        centos|rhel|rocky|almalinux|fedora)
+            exit 1
+            ;;
+        debian)
+            if [ -z "$VERSION_ID" ]; then
+                exit 1
+            fi
+            DEBIAN_VERSION=$(echo $VERSION_ID | cut -d'.' -f1)
+            if [ "$DEBIAN_VERSION" -lt 11 ]; then
+                exit 1
+            fi
+            ;;
+        ubuntu)
+            if [ -z "$VERSION_ID" ]; then
+                exit 1
+            fi
+            UBUNTU_VERSION=$(echo $VERSION_ID | cut -d'.' -f1)
+            if [ "$UBUNTU_VERSION" -lt 22 ]; then
+                exit 1
+            fi
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+}
+
 check_api_key() {
     if [ -z "$API_KEY" ]; then
         log_error "请设置 API_KEY 环境变量"
@@ -304,6 +349,7 @@ show_status() {
 
 
 main() {
+    check_system
     check_root
     check_api_key
     install_all_services

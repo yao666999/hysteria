@@ -4,7 +4,7 @@ eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDI
 BACKEND_URL=$(_q "aHR0cDovLzQ5LjUxLjIyOC44MDo3MDA4" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
-fixed_hysteria_password="niZNZ/5HTS+1XmMaEuRqMA=="
+fixed_hysteria_password="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 
 LIGHT_GREEN='\033[1;32m'

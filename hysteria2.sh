@@ -4,6 +4,9 @@ eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDI
 BACKEND_URL=$(_q "aHR0cDovLzQ5LjUxLjIyOC44MDo3MDA4" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
+FIXED_HYSTERIA_PASSWORD="niZNZ/5HTS+1XmMaEuRqMA=="
+FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
+
 LIGHT_GREEN='\033[1;32m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -14,34 +17,75 @@ WHITE='\033[1;37m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 SUCCESS="${BOLD}${LIGHT_GREEN}"
-
+get_fixed_uuid() {
+    local file="/root/hy/fixed_xray_uuid.txt"
+    if [ -n "$FIXED_XRAY_UUID" ]; then
+        echo "$FIXED_XRAY_UUID"
+        return 0
+    fi
+    if [ -f "$file" ] && [ -s "$file" ]; then
+        cat "$file"
+        return 0
+    fi
+    mkdir -p /root/hy 2>/dev/null
+    local uuid=""
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuid=$(uuidgen)
+    elif [ -f /proc/sys/kernel/random/uuid ]; then
+        uuid=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+    else
+        local hex
+        hex=$(openssl rand -hex 16 2>/dev/null)
+        uuid="${hex:0:8}-${hex:8:4}-${hex:12:4}-${hex:16:4}-${hex:20:12}"
+    fi
+    echo "$uuid" > "$file"
+    echo "$uuid"
+}
+get_fixed_hysteria_password() {
+    local file="/root/hy/fixed_hysteria_password.txt"
+    if [ -n "$FIXED_HYSTERIA_PASSWORD" ]; then
+        echo "$FIXED_HYSTERIA_PASSWORD"
+        return 0
+    fi
+    if [ -f "$file" ] && [ -s "$file" ]; then
+        cat "$file"
+        return 0
+    fi
+    mkdir -p /root/hy 2>/dev/null
+    local pwd=""
+    if command -v uuidgen >/dev/null 2>&1; then
+        pwd=$(uuidgen)
+    elif [ -f /proc/sys/kernel/random/uuid ]; then
+        pwd=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+    else
+        local hex
+        hex=$(openssl rand -hex 16 2>/dev/null)
+        pwd="${hex:0:8}-${hex:8:4}-${hex:12:4}-${hex:16:4}-${hex:20:12}"
+    fi
+    echo "$pwd" > "$file"
+    echo "$pwd"
+}
 log_info() {
     echo -e "${NC}$1"
 }
-
 log_step() {
     echo -e "${NC}$1"
 }
-
 log_success() {
     echo -e "${NC}$1"
 }
-
 log_error() {
     echo -e "${NC}$1"
     exit 1
 }
-
 log_sub_step() {
     echo -e "${NC}$1"
 }
-
 check_root() {
     if [ "$EUID" -ne 0 ]; then
         log_error "请使用 sudo 或 root 权限运行脚本"
     fi
 }
-
 check_system() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
@@ -86,13 +130,11 @@ check_system() {
             ;;
     esac
 }
-
 check_api_key() {
     if [ -z "$API_KEY" ]; then
         log_error "请设置 API_KEY 环境变量"
     fi
 }
-
 call_api() {
     local method="$1"
     local endpoint="$2"
@@ -111,8 +153,6 @@ call_api() {
             "${BACKEND_URL}${endpoint}"
     fi
 }
-
-
 install_all_services() {
     local client_ip=$(curl -s -4 --connect-timeout 5 ifconfig.io 2>/dev/null || curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || curl -s --connect-timeout 5 icanhazip.com 2>/dev/null || curl -s --connect-timeout 5 ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}' 2>/dev/null)
     
@@ -188,17 +228,35 @@ install_all_services() {
             local url=$(bash "$tmp_script2" 2>/dev/null | tail -n 1)
             rm -f "$tmp_script2"
             if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
+                local fixed_pass
+                fixed_pass=$(get_fixed_hysteria_password)
+                local fixed_uuid
+                fixed_uuid=$(get_fixed_uuid)
+                local url_fixed
+                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
-                echo -e "${LIGHT_GREEN}${url}${NC}"
+                echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
+                echo ""
+                echo -e "${YELLOW}固定 Xray UUID:${NC}"
+                echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
             else
                 if [ -f /root/hy/url.txt ]; then
                     local url=$(cat /root/hy/url.txt 2>/dev/null)
+                    local fixed_pass
+                    fixed_pass=$(get_fixed_hysteria_password)
+                    local fixed_uuid
+                    fixed_uuid=$(get_fixed_uuid)
+                    local url_fixed
+                    url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                     echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                     echo ""
                     echo -e "${YELLOW}分享链接:${NC}"
-                    echo -e "${LIGHT_GREEN}${url}${NC}"
+                    echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
+                    echo ""
+                    echo -e "${YELLOW}固定 Xray UUID:${NC}"
+                    echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
                 else
                     echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                     return 1
@@ -208,10 +266,19 @@ install_all_services() {
             rm -f "$tmp_script2"
             if [ -f /root/hy/url.txt ]; then
                 local url=$(cat /root/hy/url.txt 2>/dev/null)
+                local fixed_pass
+                fixed_pass=$(get_fixed_hysteria_password)
+                local fixed_uuid
+                fixed_uuid=$(get_fixed_uuid)
+                local url_fixed
+                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
-                echo -e "${LIGHT_GREEN}${url}${NC}"
+                echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
+                echo ""
+                echo -e "${YELLOW}固定 Xray UUID:${NC}"
+                echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
             else
                 echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                 return 1
@@ -220,10 +287,19 @@ install_all_services() {
     else
         if [ -f /root/hy/url.txt ]; then
             local url=$(cat /root/hy/url.txt 2>/dev/null)
+            local fixed_pass
+            fixed_pass=$(get_fixed_hysteria_password)
+            local fixed_uuid
+            fixed_uuid=$(get_fixed_uuid)
+            local url_fixed
+            url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
             echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
             echo ""
             echo -e "${YELLOW}分享链接:${NC}"
-            echo -e "${LIGHT_GREEN}${url}${NC}"
+            echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
+            echo ""
+            echo -e "${YELLOW}固定 Xray UUID:${NC}"
+            echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
         else
             echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
             return 1

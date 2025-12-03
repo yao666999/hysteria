@@ -4,7 +4,7 @@ eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDI
 BACKEND_URL=$(_q "aHR0cDovLzQ5LjUxLjIyOC44MDo3MDA4" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
-FIXED_HYSTERIA_PASSWORD="niZNZ/5HTS+1XmMaEuRqMA=="
+fixed_hysteria_password="niZNZ/5HTS+1XmMaEuRqMA=="
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 
 LIGHT_GREEN='\033[1;32m'
@@ -43,8 +43,8 @@ get_fixed_uuid() {
 }
 get_fixed_hysteria_password() {
     local file="/root/hy/fixed_hysteria_password.txt"
-    if [ -n "$FIXED_HYSTERIA_PASSWORD" ]; then
-        echo "$FIXED_HYSTERIA_PASSWORD"
+    if [ -n "$fixed_hysteria_password" ]; then
+        echo "$fixed_hysteria_password"
         return 0
     fi
     if [ -f "$file" ] && [ -s "$file" ]; then
@@ -230,33 +230,23 @@ install_all_services() {
             if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
                 local fixed_pass
                 fixed_pass=$(get_fixed_hysteria_password)
-                local fixed_uuid
-                fixed_uuid=$(get_fixed_uuid)
                 local url_fixed
                 url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
                 echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-                echo ""
-                echo -e "${YELLOW}固定 Xray UUID:${NC}"
-                echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
             else
                 if [ -f /root/hy/url.txt ]; then
                     local url=$(cat /root/hy/url.txt 2>/dev/null)
                     local fixed_pass
                     fixed_pass=$(get_fixed_hysteria_password)
-                    local fixed_uuid
-                    fixed_uuid=$(get_fixed_uuid)
                     local url_fixed
                     url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                     echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                     echo ""
                     echo -e "${YELLOW}分享链接:${NC}"
                     echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-                    echo ""
-                    echo -e "${YELLOW}固定 Xray UUID:${NC}"
-                    echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
                 else
                     echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                     return 1
@@ -268,17 +258,12 @@ install_all_services() {
                 local url=$(cat /root/hy/url.txt 2>/dev/null)
                 local fixed_pass
                 fixed_pass=$(get_fixed_hysteria_password)
-                local fixed_uuid
-                fixed_uuid=$(get_fixed_uuid)
                 local url_fixed
                 url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
                 echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-                echo ""
-                echo -e "${YELLOW}固定 Xray UUID:${NC}"
-                echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
             else
                 echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                 return 1
@@ -289,17 +274,12 @@ install_all_services() {
             local url=$(cat /root/hy/url.txt 2>/dev/null)
             local fixed_pass
             fixed_pass=$(get_fixed_hysteria_password)
-            local fixed_uuid
-            fixed_uuid=$(get_fixed_uuid)
             local url_fixed
             url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
             echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
             echo ""
             echo -e "${YELLOW}分享链接:${NC}"
             echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-            echo ""
-            echo -e "${YELLOW}固定 Xray UUID:${NC}"
-            echo -e "${LIGHT_GREEN}${fixed_uuid}${NC}"
         else
             echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
             return 1

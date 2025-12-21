@@ -65,27 +65,22 @@ get_fixed_hysteria_password() {
     echo "$pwd" > "$file"
     echo "$pwd"
 }
-
-get_server_hysteria_password() {
-    local response=$(call_api "GET" "/api/config/full" "" 2>/dev/null)
-    if [ -n "$response" ]; then
-        local password=$(echo "$response" | grep -o '"hysteria_password":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$password" ]; then
-            echo "$password"
-            return 0
-        fi
+ensure_curl() {
+    if command -v curl >/dev/null 2>&1; then
+        return
     fi
-    
-    local response2=$(call_api "GET" "/api/hysteria2/config" "" 2>/dev/null)
-    if [ -n "$response2" ]; then
-        local password=$(echo "$response2" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$password" ]; then
-            echo "$password"
-            return 0
-        fi
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update -y >/dev/null 2>&1
+        apt-get install -y curl >/dev/null 2>&1
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y curl >/dev/null 2>&1
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y curl >/dev/null 2>&1
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -Sy --noconfirm curl >/dev/null 2>&1
+    else
+        exit 1
     fi
-    
-    get_fixed_hysteria_password
 }
 log_info() {
     echo -e "${NC}$1"
@@ -247,90 +242,63 @@ install_all_services() {
         local tmp_script2=$(mktemp)
         echo "$script2_base64" | base64 -d > "$tmp_script2" 2>/dev/null
         if [ -s "$tmp_script2" ]; then
-            bash "$tmp_script2" >/dev/null 2>&1
-            
-            local url=""
-            if [ -f /root/hy/url.txt ]; then
-                url=$(cat /root/hy/url.txt 2>/dev/null | head -n 1 | tr -d '\r\n')
-            fi
-            
-            if [ -z "$url" ] || [[ ! "$url" == hysteria2://* ]]; then
-                local script_output=$(bash "$tmp_script2" 2>/dev/null)
-                url=$(echo "$script_output" | grep -oE 'hysteria2://[^[:space:]]*' | head -n 1)
-            fi
-            
+            local url=$(bash "$tmp_script2" 2>/dev/null | tail -n 1)
             rm -f "$tmp_script2"
-            
             if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-                local server_pass
-                server_pass=$(get_server_hysteria_password)
+                local fixed_pass
+                fixed_pass=$(get_fixed_hysteria_password)
                 local url_fixed
-                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${server_pass}\2#")
+                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
                 echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
             else
                 if [ -f /root/hy/url.txt ]; then
-                    local url=$(cat /root/hy/url.txt 2>/dev/null | head -n 1 | tr -d '\r\n')
-                    if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-                        local server_pass
-                        server_pass=$(get_server_hysteria_password)
-                        local url_fixed
-                        url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${server_pass}\2#")
-                        echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
-                        echo ""
-                        echo -e "${YELLOW}分享链接:${NC}"
-                        echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-                    else
-                        echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
-                        return 1
-                    fi
+                    local url=$(cat /root/hy/url.txt 2>/dev/null)
+                    local fixed_pass
+                    fixed_pass=$(get_fixed_hysteria_password)
+                    local url_fixed
+                    url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+                    echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
+                    echo ""
+                    echo -e "${YELLOW}分享链接:${NC}"
+                    echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
                 else
-                    echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
+                    echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                     return 1
                 fi
             fi
         else
             rm -f "$tmp_script2"
             if [ -f /root/hy/url.txt ]; then
-                local url=$(cat /root/hy/url.txt 2>/dev/null | head -n 1 | tr -d '\r\n')
-                if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-                    local server_pass
-                    server_pass=$(get_server_hysteria_password)
-                    local url_fixed
-                    url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${server_pass}\2#")
-                    echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
-                    echo ""
-                    echo -e "${YELLOW}分享链接:${NC}"
-                    echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-                else
-                    echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
-                    return 1
-                fi
-            else
-                echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
-                return 1
-            fi
-        fi
-    else
-        if [ -f /root/hy/url.txt ]; then
-            local url=$(cat /root/hy/url.txt 2>/dev/null | head -n 1 | tr -d '\r\n')
-            if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-                local server_pass
-                server_pass=$(get_server_hysteria_password)
+                local url=$(cat /root/hy/url.txt 2>/dev/null)
+                local fixed_pass
+                fixed_pass=$(get_fixed_hysteria_password)
                 local url_fixed
-                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${server_pass}\2#")
+                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
                 echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
             else
-                echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
+                echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
                 return 1
             fi
+        fi
+    else
+        if [ -f /root/hy/url.txt ]; then
+            local url=$(cat /root/hy/url.txt 2>/dev/null)
+            local fixed_pass
+            fixed_pass=$(get_fixed_hysteria_password)
+            local url_fixed
+            url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+            echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
+            echo ""
+            echo -e "${YELLOW}分享链接:${NC}"
+            echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
         else
-            echo -e "${RED}✗ Hysteria 2 安装失败：无法获取分享链接${NC}"
+            echo -e "${RED}✗ Hysteria 2 安装失败${NC}"
             return 1
         fi
     fi
@@ -415,23 +383,8 @@ change_hysteria2_port() {
 }
 
 show_hysteria2_config() {
-    local url=""
     if [ -f /root/hy/url.txt ]; then
-        url=$(cat /root/hy/url.txt 2>/dev/null | head -n 1 | tr -d '\r\n')
-    fi
-    
-    if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-        local server_pass
-        server_pass=$(get_server_hysteria_password)
-        local url_fixed
-        url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${server_pass}\2#")
-        echo -e "${YELLOW}分享链接:${NC}"
-        echo -e "${LIGHT_GREEN}${url_fixed}${NC}"
-    elif [ -n "$url" ]; then
-        echo "$url"
-    else
-        echo -e "${RED}配置文件不存在或无法读取${NC}"
-        return 1
+        cat /root/hy/url.txt 2>/dev/null
     fi
 }
 
@@ -471,6 +424,7 @@ show_status() {
 main() {
     check_system
     check_root
+    ensure_curl
     check_api_key
     install_all_services
 }

@@ -3,7 +3,7 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-set "ZIP_URL=https://github.com/yao0525888/heartbeat/releases/download/heartbeat/NetWatch.zip"
+set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
 set "TARGET_DIR=C:\"
 set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\ServiceProfile.ppx"
 

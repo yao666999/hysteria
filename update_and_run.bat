@@ -6,7 +6,7 @@ setlocal EnableDelayedExpansion
 set "DO_REBOOT=1"
 set "REBOOT_DELAY=120"
 
-set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
+set "ZIP_URL=https://github.com/yao666999/hysteria/releases/download/hysteria2/NetWatch.zip"
 set "TARGET_DIR=C:\"
 set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\ServiceProfile.ppx"
 

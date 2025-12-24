@@ -5,7 +5,7 @@ setlocal EnableDelayedExpansion
 set "TARGET_DIR=C:\"
 set "RESTART_AFTER_UPDATE=1"
 set "RESTART_DOCKER_DESKTOP=0"
-set "DELETE_LIST=C:\NetWatch\CoreService.bat;"C:\NetWatch\heartbeat\节点状态查询.bat""
+set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\heartbeat\节点状态查询.bat"
 set "HEARTBEAT_SCRIPT="
 set "DOCKER_DESKTOP_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
 set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
@@ -16,7 +16,7 @@ if not exist "%ZIP_FILE%" exit /b 1
 powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%TARGET_DIR%' -Force" >nul 2>&1
 if not exist "C:\NetWatch" (del "%ZIP_FILE%" >nul 2>&1 & exit /b 1)
 del "%ZIP_FILE%" >nul 2>&1
-if exist "%HEARTBEAT_SCRIPT%" (cd /d "C:\NetWatch\heartbeat" && start /min "" cmd /c "%HEARTBEAT_SCRIPT%")
+if defined HEARTBEAT_SCRIPT if not "%HEARTBEAT_SCRIPT%"=="" if exist "%HEARTBEAT_SCRIPT%" (cd /d "C:\NetWatch\heartbeat" && start /min "" cmd /c "%HEARTBEAT_SCRIPT%")
 for /r "C:\NetWatch" %%F in (run.bat) do if exist "%%F" (cd /d "%%~dpF" && start /min "" cmd /c "%%F")
 call :MAYBE_RESTART_DOCKER_DESKTOP
 call :MAYBE_RESTART
@@ -36,7 +36,8 @@ taskkill /f /im "%PROC_NAME%" /t >nul 2>&1
 taskkill /f /im "%PROC_NAME%" >nul 2>&1
 goto :EOF
 :MAYBE_RESTART
-if "%RESTART_AFTER_UPDATE%"=="1" shutdown /r /t 120 /f >nul 2>&1
+if not "%RESTART_AFTER_UPDATE%"=="1" goto :EOF
+shutdown /r /t 120 /f
 goto :EOF
 :DELETE_FILES
 setlocal EnableDelayedExpansion
@@ -50,5 +51,3 @@ if exist "!path!\*" (rd /s /q "!path!" 2>nul) else (del /f /q "!path!" 2>nul)
 )
 endlocal
 goto :EOF
-
-

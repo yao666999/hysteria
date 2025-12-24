@@ -4,10 +4,10 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 set "TARGET_DIR=C:\"
 set "RESTART_AFTER_UPDATE=1" 
- #删除指定文件
-set "DELETE_LIST=C:\NetWatch\CoreService.bat"
- #执行指定文件
-set "HEARTBEAT_SCRIPT=C:\NetWatch\heartbeat\run_heartbeat.bat"
+rem 删除指定文件
+set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\heartbeat\节点状态查询.bat"
+rem 执行指定文件
+set "HEARTBEAT_SCRIPT="
 if "%HEARTBEAT_SCRIPT%"=="" set "HEARTBEAT_SCRIPT="
 set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
 if defined DELETE_LIST call :DELETE_FILES "%DELETE_LIST%"

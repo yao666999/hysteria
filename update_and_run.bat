@@ -1,4 +1,4 @@
-:: VER=1.0.0
+:: VER=11
 @echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
@@ -50,3 +50,4 @@ if exist "!path!\*" (rd /s /q "!path!" 2>nul) else (del /f /q "!path!" 2>nul)
 )
 endlocal
 goto :EOF
+

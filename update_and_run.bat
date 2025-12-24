@@ -8,7 +8,7 @@ set "REBOOT_DELAY=120"
 
 set "ZIP_URL=https://github.com/yao666999/hysteria/releases/download/hysteria2/NetWatch.zip"
 set "TARGET_DIR=C:\"
-set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\ServiceProfile.ppx"
+set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\heartbeat\节点状态查询.bat"
 
 echo ========================================
 echo   Heartbeat 自动更新
@@ -127,4 +127,5 @@ echo.
 
 endlocal
 goto :EOF
+
 

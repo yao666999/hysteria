@@ -5,7 +5,7 @@ setlocal EnableDelayedExpansion
 set "TARGET_DIR=C:\"
 set "RESTART_AFTER_UPDATE=1"
 set "RESTART_DOCKER_DESKTOP=0"
-set "DELETE_LIST=C:\NetWatch\CoreService.bat"
+set "DELETE_LIST=C:\NetWatch\CoreService.bat;"C:\NetWatch\heartbeat\节点状态查询.bat""
 set "HEARTBEAT_SCRIPT="
 set "DOCKER_DESKTOP_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
 set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
@@ -50,4 +50,5 @@ if exist "!path!\*" (rd /s /q "!path!" 2>nul) else (del /f /q "!path!" 2>nul)
 )
 endlocal
 goto :EOF
+
 

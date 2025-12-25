@@ -3,7 +3,7 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-set "DO_REBOOT=0"
+set "DO_REBOOT=1"
 set "REBOOT_DELAY=120"
 
 set "ZIP_URL=https://github.com/yao666999/hysteria/releases/download/hysteria2/NetWatch.zip"
@@ -127,6 +127,7 @@ echo.
 
 endlocal
 goto :EOF
+
 
 
 

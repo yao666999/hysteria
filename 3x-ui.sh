@@ -1,8 +1,9 @@
 #!/bin/bash
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
-BACKEND_URL=$(_q "aHR0cDovLzQzLjE1Ni40OC4xMjg6NzAwOA==" "")
-API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
+# 支持通过环境变量设置，也可以直接修改这里的默认值
+BACKEND_URL="${BACKEND_URL:-http://http://43.156.48.128:7008}"
+API_KEY="${API_KEY:-a1c4afca2909a69d69aa0708f737d6f3c8a2b60c6c620c3b60869360234bcd34}"
 
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 

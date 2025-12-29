@@ -254,7 +254,14 @@ install_panel() {
   if [ -n "$panel_domain" ]; then
     data="{\"domain\": \"$panel_domain\"}"
   fi
+
+  echo -e "${BLUE}» 正在调用后端API...${NC}"
+  echo -e "${BLUE}» API地址: ${BACKEND_URL}/api/install/3xui${NC}"
+  echo -e "${BLUE}» 请求数据: $data${NC}"
+
   local response=$(call_api "POST" "/api/install/3xui" "$data")
+
+  echo -e "${BLUE}» API响应: $response${NC}"
 
   if echo "$response" | grep -q '"success":true'; then
     local script_base64=$(echo "$response" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)

@@ -19,7 +19,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "请选择操作："
-echo "1) 安装网页"
+echo "1) 安装网页服务"
 echo "2) 卸载"
 echo "3) 更新 index.html 文件"
 echo "4) 申请/更新HTTPS证书"
@@ -800,8 +800,8 @@ EOF
                     
                     echo "创建必要的目录..."
                     mkdir -p /etc/nginx/conf.d
-                    mkdir -p /var/log/nginx
-                    mkdir -p /var/cache/nginx
+                    mkdir -p /usr/local/nginx/logs
+                    mkdir -p /usr/local/nginx/conf.d
                     
                     echo "创建systemd服务文件..."
                     cat > /etc/systemd/system/nginx.service <<'EOF'
@@ -811,7 +811,7 @@ After=network.target remote-fs.target nss-lookup.target
 
 [Service]
 Type=forking
-PIDFile=/var/run/nginx.pid
+PIDFile=/usr/local/nginx/logs/nginx.pid
 ExecStartPre=/usr/local/nginx/sbin/nginx -t -c /usr/local/nginx/conf/nginx.conf
 ExecStart=/usr/local/nginx/sbin/nginx -c /usr/local/nginx/conf/nginx.conf
 ExecReload=/bin/kill -s HUP $MAINPID
@@ -926,7 +926,7 @@ MIMETYPES
         cat > "$NGINX_CONF_FILE" <<NGINXMAIN
 user www-data;
 worker_processes auto;
-pid /var/run/nginx.pid;
+pid /usr/local/nginx/logs/nginx.pid;
 
 events {
     worker_connections 1024;
@@ -935,10 +935,10 @@ events {
 http {
     include $MIME_TYPES;
     default_type application/octet-stream;
-    
+
     sendfile on;
     keepalive_timeout 65;
-    
+
     include $NGINX_CONF_DIR/conf.d/*.conf;
 }
 NGINXMAIN

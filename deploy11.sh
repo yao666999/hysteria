@@ -19,7 +19,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "请选择操作："
-echo "1) 安装网页服务"
+echo "1) 安装网页"
 echo "2) 卸载"
 echo "3) 更新 index.html 文件"
 echo "4) 申请/更新HTTPS证书"
@@ -1442,11 +1442,15 @@ if [ "$action" = "5" ]; then
     if [ -n "$NGINX_CONF_DIR" ]; then
         # 修改Nginx配置文件中的端口
         if [ -f "$NGINX_CONF_DIR/conf.d/customer-data.conf" ]; then
+            echo "正在修改HTTP配置文件..."
             sed -i "s/listen $PORT;/listen $NEW_PORT;/g" "$NGINX_CONF_DIR/conf.d/customer-data.conf"
+            echo "HTTP配置文件已更新"
         fi
         if [ -f "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf" ]; then
+            echo "正在修改HTTPS配置文件..."
             sed -i "s/listen $PORT ssl/listen $NEW_PORT ssl/g" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
             sed -i "s/listen $PORT default_server;/listen $NEW_PORT default_server;/g" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
+            echo "HTTPS配置文件已更新"
         fi
     fi
 
@@ -1505,9 +1509,17 @@ EOF
     fi
 
     # 启动Nginx
+    echo "正在启动Nginx服务..."
     if [ -f "/etc/systemd/system/nginx.service" ]; then
         systemctl daemon-reload 2>/dev/null || true
-        systemctl start nginx 2>/dev/null || service nginx start 2>/dev/null || true
+        systemctl enable nginx 2>/dev/null || true
+        if systemctl start nginx 2>/dev/null; then
+            echo "Nginx服务已启动"
+        elif service nginx start 2>/dev/null; then
+            echo "Nginx服务已启动 (使用service命令)"
+        else
+            echo "警告：Nginx启动失败"
+        fi
     else
         NGINX_BIN=""
         if command -v nginx &> /dev/null; then
@@ -1516,7 +1528,35 @@ EOF
             NGINX_BIN="/usr/local/nginx/sbin/nginx"
         fi
         if [ -n "$NGINX_BIN" ]; then
-            $NGINX_BIN 2>/dev/null || true
+            if $NGINX_BIN 2>/dev/null; then
+                echo "Nginx已启动 (使用二进制文件)"
+            else
+                echo "警告：Nginx启动失败"
+            fi
+        fi
+    fi
+
+    # 测试Nginx配置
+    sleep 1
+    NGINX_BIN_TEST=""
+    if command -v nginx &> /dev/null; then
+        NGINX_BIN_TEST=$(which nginx)
+    elif [ -f "/usr/local/nginx/sbin/nginx" ]; then
+        NGINX_BIN_TEST="/usr/local/nginx/sbin/nginx"
+    fi
+
+    if [ -n "$NGINX_BIN_TEST" ]; then
+        NGINX_CONF_FILE_TEST=""
+        if [ -d "/usr/local/nginx/conf" ]; then
+            NGINX_CONF_FILE_TEST="/usr/local/nginx/conf/nginx.conf"
+        elif [ -d "/etc/nginx" ]; then
+            NGINX_CONF_FILE_TEST="/etc/nginx/nginx.conf"
+        fi
+
+        if [ -n "$NGINX_CONF_FILE_TEST" ] && $NGINX_BIN_TEST -t -c "$NGINX_CONF_FILE_TEST" 2>/dev/null; then
+            echo "Nginx配置测试通过"
+        else
+            echo "警告：Nginx配置测试失败，请检查配置文件"
         fi
     fi
 
@@ -1539,15 +1579,42 @@ EOF
     fi
 
     # 检查服务状态
-    sleep 2
+    echo "正在检查服务状态..."
+    sleep 3
+
     if pgrep -x nginx > /dev/null; then
+        echo "✓ Nginx进程正在运行"
+
         if netstat -tuln 2>/dev/null | grep -q ":$NEW_PORT " || ss -tuln 2>/dev/null | grep -q ":$NEW_PORT "; then
-            echo "Nginx服务运行正常，端口 $NEW_PORT 已监听"
+            echo "✓ 端口 $NEW_PORT 正在监听"
         else
-            echo "警告：Nginx服务运行中，但端口 $NEW_PORT 未监听"
+            echo "✗ 警告：端口 $NEW_PORT 未监听"
+            echo "  可能原因："
+            echo "  1. Nginx配置文件未正确更新"
+            echo "  2. Nginx重启失败"
+            echo "  3. 防火墙阻止了端口"
+            echo ""
+            echo "  建议检查："
+            echo "  - 运行: netstat -tuln | grep $NEW_PORT"
+            echo "  - 检查配置文件: cat $NGINX_CONF_DIR/conf.d/customer-data.conf"
+            echo "  - 手动重启Nginx: systemctl restart nginx"
         fi
     else
-        echo "警告：Nginx服务未运行"
+        echo "✗ 警告：Nginx进程未运行"
+        echo "  尝试手动启动: systemctl start nginx"
+    fi
+
+    # 检查API服务器
+    if [ -f "$WEB_DIR/api_server.py" ] && command -v python3 &> /dev/null; then
+        if systemctl is-active --quiet customer-data-api.service 2>/dev/null || pgrep -f "api_server.py" > /dev/null; then
+            if netstat -tuln 2>/dev/null | grep -q ":$NEW_API_PORT " || ss -tuln 2>/dev/null | grep -q ":$NEW_API_PORT "; then
+                echo "✓ API服务器运行正常，端口 $NEW_API_PORT 已监听"
+            else
+                echo "✗ 警告：API服务器运行中，但端口 $NEW_API_PORT 未监听"
+            fi
+        else
+            echo "✗ 警告：API服务器未运行"
+        fi
     fi
 
     echo ""

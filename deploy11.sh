@@ -19,11 +19,12 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "请选择操作："
-echo "1) 安装1"
+echo "1) 安装网页服务"
 echo "2) 卸载"
 echo "3) 更新 index.html 文件"
 echo "4) 申请/更新HTTPS证书"
-read -p "请输入选项 [1-4] (默认1): " action
+echo "5) 修改端口"
+read -p "请输入选项 [1-5] (默认1): " action
 action=${action:-1}
 
 if [ "$action" = "3" ]; then
@@ -1379,6 +1380,188 @@ else
     echo ""
     echo "如果服务器只有内网IP，请使用内网地址访问："
     echo "  http://$LOCAL_IP:$PORT/$FILE_NAME"
+fi
+
+if [ "$action" = "5" ]; then
+    echo ""
+    echo "=========================================="
+    echo "  修改端口"
+    echo "=========================================="
+    echo ""
+
+    echo "当前端口配置："
+    echo "  主端口 (HTTP/HTTPS): $PORT"
+    echo "  API端口: $API_PORT"
+    echo ""
+
+    read -p "请输入新的主端口 (1-65535): " NEW_PORT
+    if ! [[ "$NEW_PORT" =~ ^[0-9]+$ ]] || [ "$NEW_PORT" -lt 1 ] || [ "$NEW_PORT" -gt 65535 ]; then
+        echo "错误：无效的端口号，请输入1-65535之间的数字"
+        exit 1
+    fi
+
+    # 检查端口是否被占用
+    if netstat -tuln 2>/dev/null | grep -q ":$NEW_PORT " || ss -tuln 2>/dev/null | grep -q ":$NEW_PORT "; then
+        echo "错误：端口 $NEW_PORT 已被占用"
+        exit 1
+    fi
+
+    read -p "请输入新的API端口 (1-65535, 回车保持$API_PORT): " NEW_API_PORT
+    NEW_API_PORT=${NEW_API_PORT:-$API_PORT}
+    if ! [[ "$NEW_API_PORT" =~ ^[0-9]+$ ]] || [ "$NEW_API_PORT" -lt 1 ] || [ "$NEW_API_PORT" -gt 65535 ]; then
+        echo "错误：无效的API端口号，使用默认值 $API_PORT"
+        NEW_API_PORT=$API_PORT
+    fi
+
+    # 检查API端口是否被占用
+    if [ "$NEW_API_PORT" != "$API_PORT" ] && (netstat -tuln 2>/dev/null | grep -q ":$NEW_API_PORT " || ss -tuln 2>/dev/null | grep -q ":$NEW_API_PORT "); then
+        echo "错误：API端口 $NEW_API_PORT 已被占用"
+        exit 1
+    fi
+
+    echo ""
+    echo "正在修改端口配置..."
+    echo "  主端口: $PORT → $NEW_PORT"
+    echo "  API端口: $API_PORT → $NEW_API_PORT"
+
+    # 停止服务
+    echo "正在停止相关服务..."
+    systemctl stop customer-data-api.service 2>/dev/null || true
+    pkill -f "api_server.py" 2>/dev/null || true
+    systemctl stop nginx 2>/dev/null || service nginx stop 2>/dev/null || true
+
+    # 备份当前配置文件
+    NGINX_CONF_DIR=""
+    NGINX_CONF_FILE=""
+    if [ -d "/usr/local/nginx/conf" ]; then
+        NGINX_CONF_DIR="/usr/local/nginx/conf"
+    elif [ -d "/etc/nginx" ]; then
+        NGINX_CONF_DIR="/etc/nginx"
+    fi
+
+    if [ -n "$NGINX_CONF_DIR" ]; then
+        # 修改Nginx配置文件中的端口
+        if [ -f "$NGINX_CONF_DIR/conf.d/customer-data.conf" ]; then
+            sed -i "s/listen $PORT;/listen $NEW_PORT;/g" "$NGINX_CONF_DIR/conf.d/customer-data.conf"
+        fi
+        if [ -f "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf" ]; then
+            sed -i "s/listen $PORT ssl/listen $NEW_PORT ssl/g" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
+            sed -i "s/listen $PORT default_server;/listen $NEW_PORT default_server;/g" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
+        fi
+    fi
+
+    # 更新脚本中的端口变量（临时修改）
+    PORT="$NEW_PORT"
+    HTTPS_PORT="$PORT"
+    API_PORT="$NEW_API_PORT"
+
+    # 重新启动服务
+    echo "正在重新启动服务..."
+
+    # 启动API服务器
+    if [ -f "$WEB_DIR/api_server.py" ]; then
+        if command -v python3 &> /dev/null; then
+            pkill -f "api_server.py" 2>/dev/null || true
+            sleep 1
+            if systemctl is-active --quiet customer-data-api.service 2>/dev/null; then
+                systemctl stop customer-data-api.service 2>/dev/null || true
+            fi
+
+            cat > /etc/systemd/system/customer-data-api.service <<EOF
+[Unit]
+Description=Customer Data API Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$WEB_DIR
+ExecStart=/usr/bin/python3 $WEB_DIR/api_server.py $API_PORT
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            systemctl daemon-reload
+            systemctl enable customer-data-api.service
+            systemctl start customer-data-api.service
+            sleep 2
+            if systemctl is-active --quiet customer-data-api.service; then
+                echo "API服务器已重新启动 (端口 $API_PORT)"
+            else
+                echo "警告：API服务器启动失败，尝试使用nohup方式启动..."
+                nohup python3 "$WEB_DIR/api_server.py" "$API_PORT" > /dev/null 2>&1 &
+                sleep 2
+                if pgrep -f "api_server.py" > /dev/null; then
+                    echo "API服务器已启动 (端口 $API_PORT，nohup方式)"
+                else
+                    echo "警告：API服务器启动失败"
+                fi
+            fi
+        fi
+    fi
+
+    # 启动Nginx
+    if [ -f "/etc/systemd/system/nginx.service" ]; then
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl start nginx 2>/dev/null || service nginx start 2>/dev/null || true
+    else
+        NGINX_BIN=""
+        if command -v nginx &> /dev/null; then
+            NGINX_BIN=$(which nginx)
+        elif [ -f "/usr/local/nginx/sbin/nginx" ]; then
+            NGINX_BIN="/usr/local/nginx/sbin/nginx"
+        fi
+        if [ -n "$NGINX_BIN" ]; then
+            $NGINX_BIN 2>/dev/null || true
+        fi
+    fi
+
+    # 更新防火墙
+    if command -v ufw &> /dev/null; then
+        ufw delete allow $PORT/tcp 2>/dev/null || true
+        ufw allow $NEW_PORT/tcp 2>/dev/null || true
+        if [ "$NEW_API_PORT" != "$API_PORT" ]; then
+            ufw delete allow $API_PORT/tcp 2>/dev/null || true
+            ufw allow $NEW_API_PORT/tcp 2>/dev/null || true
+        fi
+    elif command -v firewall-cmd &> /dev/null; then
+        firewall-cmd --permanent --remove-port=$PORT/tcp 2>/dev/null || true
+        firewall-cmd --permanent --add-port=$NEW_PORT/tcp 2>/dev/null || true
+        if [ "$NEW_API_PORT" != "$API_PORT" ]; then
+            firewall-cmd --permanent --remove-port=$API_PORT/tcp 2>/dev/null || true
+            firewall-cmd --permanent --add-port=$NEW_API_PORT/tcp 2>/dev/null || true
+        fi
+        firewall-cmd --reload 2>/dev/null || true
+    fi
+
+    # 检查服务状态
+    sleep 2
+    if pgrep -x nginx > /dev/null; then
+        if netstat -tuln 2>/dev/null | grep -q ":$NEW_PORT " || ss -tuln 2>/dev/null | grep -q ":$NEW_PORT "; then
+            echo "Nginx服务运行正常，端口 $NEW_PORT 已监听"
+        else
+            echo "警告：Nginx服务运行中，但端口 $NEW_PORT 未监听"
+        fi
+    else
+        echo "警告：Nginx服务未运行"
+    fi
+
+    echo ""
+    echo "=========================================="
+    echo "✅ 端口修改完成！"
+    echo "=========================================="
+    echo ""
+    echo "新的端口配置："
+    echo "  主端口 (HTTP/HTTPS): $NEW_PORT"
+    echo "  API端口: $NEW_API_PORT"
+    echo ""
+    echo "注意：请手动更新客户端配置中的端口号"
+    echo ""
+    exit 0
 fi
 
 echo ""

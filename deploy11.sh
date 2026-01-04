@@ -8,7 +8,7 @@ echo ""
 WEB_DIR="/var/www/html"
 FILE_NAME="index.html"
 GITHUB_URL="https://github.com/lolajm485-stack/Lorist/releases/download/websiteList/index.html"
-PORT="7009"
+PORT="999"
 HTTPS_PORT="$PORT"
 API_PORT="7010"
 CURRENT_DIR=$(pwd)

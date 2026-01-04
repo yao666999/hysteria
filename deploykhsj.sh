@@ -111,7 +111,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "请选择操作："
-echo "1) 安装网页服务"
+echo "1) 安装网页服务1"
 echo "2) 卸载网页服务"
 echo "3) 更新 index.html 文件"
 echo "4) 申请/更新HTTPS证书"

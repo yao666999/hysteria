@@ -992,6 +992,8 @@ EOF
         REDIRECT_SUFFIX=":$PORT"
     fi
 
+    HTTPS_PORT="$PORT"
+
     echo ""
     echo "创建ACME验证配置（80端口）..."
     mkdir -p "$NGINX_CONF_DIR/conf.d"
@@ -1080,7 +1082,7 @@ EOF
         exit 1
     fi
 
-    echo "创建HTTPS站点配置（443端口）..."
+    echo "创建HTTPS站点配置（$HTTPS_PORT端口）..."
     rm -f "$NGINX_CONF_DIR/conf.d/customer-data-ssl.conf" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf.http.bak" 2>/dev/null || true
     SSL_CONF="$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
     cat > "$SSL_CONF" <<EOF
@@ -1098,7 +1100,7 @@ server {
 }
 
  server {
-    listen 443 ssl default_server;
+    listen $HTTPS_PORT ssl default_server;
     server_name $DOMAIN_INPUT;
     root $WEB_DIR;
     index $FILE_NAME;
@@ -1123,7 +1125,7 @@ server {
 }
 EOF
 
-    if [ "$PORT" = "443" ]; then
+    if [ "$HTTPS_PORT" = "443" ]; then
         if [ -f "$NGINX_CONF_DIR/conf.d/customer-data.conf" ]; then
             mv "$NGINX_CONF_DIR/conf.d/customer-data.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf.http.bak" 2>/dev/null || true
         fi
@@ -1139,13 +1141,13 @@ EOF
     setup_nginx_service
     manage_nginx_with_systemd
 
-    echo "开放80/443端口（如有防火墙）..."
+    echo "开放80/$HTTPS_PORT端口（如有防火墙）..."
     if command -v ufw &> /dev/null; then
         ufw allow 80/tcp 2>/dev/null || true
-        ufw allow 443/tcp 2>/dev/null || true
+        ufw allow $HTTPS_PORT/tcp 2>/dev/null || true
     elif command -v firewall-cmd &> /dev/null; then
         firewall-cmd --permanent --add-port=80/tcp 2>/dev/null || true
-        firewall-cmd --permanent --add-port=443/tcp 2>/dev/null || true
+        firewall-cmd --permanent --add-port=$HTTPS_PORT/tcp 2>/dev/null || true
         firewall-cmd --reload 2>/dev/null || true
     fi
 
@@ -1155,10 +1157,10 @@ EOF
     echo "=========================================="
     echo "证书路径: $SSL_CERT"
     echo "密钥路径: $SSL_KEY"
-    echo "访问地址: https://$PRIMARY_DOMAIN"
+    echo "访问地址: https://$PRIMARY_DOMAIN$REDIRECT_SUFFIX"
     echo ""
     echo "若更新证书，重复选择该选项即可。certbot会自动续期（见 /etc/letsencrypt/renewal）。"
-    echo "如需同时保留原有 $PORT 端口访问，可保留原配置；若不需要，可移除对应conf。"
+    echo "如需同时保留原有 $HTTPS_PORT 端口访问，可保留原配置；若不需要，可移除对应conf。"
     exit 0
 fi
 

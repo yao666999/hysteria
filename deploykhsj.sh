@@ -11,6 +11,100 @@ GITHUB_URL="https://github.com/lolajm485-stack/Lorist/releases/download/websiteL
 PORT="7009"
 CURRENT_DIR=$(pwd)
 
+# 函数：处理index.html文件下载和更新
+handle_index_html() {
+    local target_path=$1
+    local create_backup=${2:-false}
+
+    if [ "$create_backup" = true ] && [ -f "$target_path" ]; then
+        echo "正在备份当前文件..."
+        local BACKUP_FILE="${target_path}.backup.$(date +%Y%m%d_%H%M%S)"
+        cp "$target_path" "$BACKUP_FILE" 2>/dev/null || {
+            echo "警告：无法创建备份文件，继续更新..."
+        }
+        if [ -f "$BACKUP_FILE" ]; then
+            echo "备份已创建: $BACKUP_FILE"
+        fi
+    fi
+
+    if [ -f "$CURRENT_DIR/$FILE_NAME" ]; then
+        echo "检测到本地 $FILE_NAME 文件，使用本地文件..."
+        cp "$CURRENT_DIR/$FILE_NAME" "$target_path"
+        if [ -f "$target_path" ] && [ -s "$target_path" ]; then
+            echo "本地文件复制成功"
+        else
+            echo "错误：本地文件复制失败"
+            return 1
+        fi
+    else
+        echo "正在从GitHub下载文件..."
+        if command -v wget &> /dev/null; then
+            if wget -q "$GITHUB_URL" -O "${target_path}.new" 2>/dev/null; then
+                if [ -f "${target_path}.new" ] && [ -s "${target_path}.new" ]; then
+                    echo "文件下载成功"
+                    mv "${target_path}.new" "$target_path"
+                else
+                    echo "错误：下载的文件无效"
+                    rm -f "${target_path}.new" 2>/dev/null || true
+                    return 1
+                fi
+            else
+                echo "错误：文件下载失败"
+                rm -f "${target_path}.new" 2>/dev/null || true
+                return 1
+            fi
+        elif command -v curl &> /dev/null; then
+            if curl -sL "$GITHUB_URL" -o "${target_path}.new" 2>/dev/null; then
+                if [ -f "${target_path}.new" ] && [ -s "${target_path}.new" ]; then
+                    echo "文件下载成功"
+                    mv "${target_path}.new" "$target_path"
+                else
+                    echo "错误：下载的文件无效"
+                    rm -f "${target_path}.new" 2>/dev/null || true
+                    return 1
+                fi
+            else
+                echo "错误：文件下载失败"
+                rm -f "${target_path}.new" 2>/dev/null || true
+                return 1
+            fi
+        else
+            echo "错误：未找到wget或curl，无法下载文件"
+            echo "请手动安装: sudo apt install wget 或 sudo yum install wget"
+            return 1
+        fi
+    fi
+
+    # 设置文件权限
+    echo "设置文件权限..."
+    chown www-data:www-data "$target_path" 2>/dev/null || chown nginx:nginx "$target_path" 2>/dev/null || chown root:root "$target_path" 2>/dev/null || true
+    chmod 644 "$target_path"
+
+    return 0
+}
+
+# 函数：重新加载Nginx配置
+reload_nginx_config() {
+    echo "重新加载Nginx配置..."
+    if pgrep -x nginx > /dev/null; then
+        if systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true; then
+            echo "Nginx配置已重新加载"
+        else
+            local NGINX_BIN=""
+            if command -v nginx &> /dev/null; then
+                NGINX_BIN=$(which nginx)
+            elif [ -f "/usr/local/nginx/sbin/nginx" ]; then
+                NGINX_BIN="/usr/local/nginx/sbin/nginx"
+            fi
+            if [ -n "$NGINX_BIN" ]; then
+                $NGINX_BIN -s reload 2>/dev/null || echo "警告：无法重新加载Nginx，但文件已更新"
+            fi
+        fi
+    else
+        echo "警告：Nginx未运行，文件已更新但需要手动启动Nginx"
+    fi
+}
+
 if [ "$EUID" -ne 0 ]; then 
     echo "错误：请使用sudo运行此脚本"
     exit 1
@@ -19,8 +113,45 @@ fi
 echo "请选择操作："
 echo "1) 安装网页服务"
 echo "2) 卸载网页服务"
-read -p "请输入选项 [1-2] (默认1): " action
+echo "3) 更新 index.html 文件"
+echo "4) 申请/更新HTTPS证书"
+read -p "请输入选项 [1-4] (默认1): " action
 action=${action:-1}
+
+if [ "$action" = "3" ]; then
+    echo ""
+    echo "=========================================="
+    echo "  更新 index.html 文件"
+    echo "=========================================="
+    echo ""
+
+    if [ ! -f "$WEB_DIR/$FILE_NAME" ]; then
+        echo "错误：未找到已部署的 $FILE_NAME 文件"
+        echo "请先运行安装选项（选项1）"
+        exit 1
+    fi
+
+    if handle_index_html "$WEB_DIR/$FILE_NAME" true; then
+        reload_nginx_config
+
+        echo ""
+        echo "=========================================="
+        echo "✅ 文件更新完成！"
+        echo "=========================================="
+        echo ""
+        # 查找最新的备份文件
+        local LATEST_BACKUP=$(ls -t "$WEB_DIR/${FILE_NAME}.backup."* 2>/dev/null | head -1)
+        if [ -n "$LATEST_BACKUP" ]; then
+            echo "备份文件位置: $LATEST_BACKUP"
+            echo "如需恢复，请运行: cp $LATEST_BACKUP $WEB_DIR/$FILE_NAME"
+        fi
+        echo ""
+    else
+        echo "文件更新失败"
+        exit 1
+    fi
+    exit 0
+fi
 
 if [ "$action" = "2" ]; then
     echo ""
@@ -391,15 +522,11 @@ if [ ! -d "$WEB_DIR" ]; then
 fi
 
 echo "获取文件..."
-if ! get_file "$WEB_DIR/$FILE_NAME"; then
+if ! handle_index_html "$WEB_DIR/$FILE_NAME"; then
     echo "错误：无法获取文件"
     echo "请检查网络连接或手动下载文件到: $WEB_DIR/$FILE_NAME"
     exit 1
 fi
-
-echo "设置文件权限..."
-chown www-data:www-data "$WEB_DIR/$FILE_NAME" 2>/dev/null || chown nginx:nginx "$WEB_DIR/$FILE_NAME" 2>/dev/null || chown root:root "$WEB_DIR/$FILE_NAME" 2>/dev/null || true
-chmod 644 "$WEB_DIR/$FILE_NAME"
 
 echo "配置Nginx..."
 NGINX_CONF_DIR=""
@@ -709,6 +836,330 @@ else
     echo ""
     echo "如果服务器只有内网IP，请使用内网地址访问："
     echo "  http://$LOCAL_IP:$PORT/$FILE_NAME"
+fi
+
+if [ "$action" = "4" ]; then
+    echo ""
+    echo "=========================================="
+    echo "  申请/更新HTTPS证书"
+    echo "=========================================="
+    echo ""
+
+    if ! command -v nginx &> /dev/null && [ ! -f "/usr/local/nginx/sbin/nginx" ]; then
+        echo "错误：未检测到已安装的Nginx，请先执行安装步骤（选项1）"
+        exit 1
+    fi
+
+    ensure_ssl_module() {
+        if [ -n "$NGINX_BIN" ] && $NGINX_BIN -V 2>&1 | grep -q "http_ssl_module"; then
+            return 0
+        fi
+        echo "检测到当前Nginx未启用SSL模块，尝试自动编译启用SSL..."
+        BUILD_DIR="/tmp/nginx-build-ssl"
+        rm -rf "$BUILD_DIR"
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+
+        MISSING_DEPS=""
+        command -v gcc >/dev/null 2>&1 || MISSING_DEPS="$MISSING_DEPS gcc"
+        command -v make >/dev/null 2>&1 || MISSING_DEPS="$MISSING_DEPS make"
+        command -v git >/dev/null 2>&1 || MISSING_DEPS="$MISSING_DEPS git"
+        OPENSSL_CHECK=false
+        if [ -f /usr/include/openssl/ssl.h ] || [ -f /usr/local/include/openssl/ssl.h ]; then
+            OPENSSL_CHECK=true
+        fi
+        if [ "$OPENSSL_CHECK" = false ]; then
+            if command -v apt-get &> /dev/null; then
+                MISSING_DEPS="$MISSING_DEPS libssl-dev"
+            elif command -v yum &> /dev/null || command -v dnf &> /dev/null; then
+                MISSING_DEPS="$MISSING_DEPS openssl-devel"
+            fi
+        fi
+        if [ -n "$MISSING_DEPS" ]; then
+            echo "安装SSL编译依赖: $MISSING_DEPS"
+            if command -v apt-get &> /dev/null; then
+                apt-get update -y 2>/dev/null || true
+                apt-get install -y $MISSING_DEPS 2>/dev/null || true
+            elif command -v yum &> /dev/null; then
+                yum install -y $MISSING_DEPS 2>/dev/null || true
+            elif command -v dnf &> /dev/null; then
+                dnf install -y $MISSING_DEPS 2>/dev/null || true
+            fi
+        fi
+
+        if git clone https://github.com/nginx/nginx.git 2>/dev/null; then
+            cd nginx
+            if auto/configure --prefix=/usr/local/nginx --with-http_ssl_module >/dev/null 2>&1; then
+                if make -j$(nproc 2>/dev/null || echo 1) >/dev/null 2>&1 && make install >/dev/null 2>&1; then
+                    if [ -f "/usr/local/nginx/sbin/nginx" ]; then
+                        ln -sf /usr/local/nginx/sbin/nginx /usr/local/bin/nginx 2>/dev/null || true
+                        ln -sf /usr/local/nginx/sbin/nginx /usr/bin/nginx 2>/dev/null || true
+                        cd /
+                        rm -rf "$BUILD_DIR"
+                        NGINX_BIN="/usr/local/nginx/sbin/nginx"
+                        echo "Nginx已重新编译并启用SSL模块"
+                        return 0
+                    fi
+                fi
+            fi
+        fi
+        echo "自动编译启用SSL失败，请手动确保安装带http_ssl_module的Nginx"
+        return 1
+    }
+
+    setup_nginx_service() {
+        if [ -f "/etc/systemd/system/nginx.service" ]; then
+            return 0
+        fi
+        if [ -x "/usr/local/nginx/sbin/nginx" ]; then
+            cat > /etc/systemd/system/nginx.service <<'EOF'
+[Unit]
+Description=The nginx HTTP and reverse proxy server
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+PIDFile=/usr/local/nginx/logs/nginx.pid
+ExecStartPre=/usr/local/nginx/sbin/nginx -t -c /usr/local/nginx/conf/nginx.conf
+ExecStart=/usr/local/nginx/sbin/nginx -c /usr/local/nginx/conf/nginx.conf
+ExecReload=/usr/local/nginx/sbin/nginx -s reload
+ExecStop=/usr/local/nginx/sbin/nginx -s quit
+TimeoutStopSec=5
+KillMode=process
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            systemctl daemon-reload 2>/dev/null || true
+            systemctl enable nginx 2>/dev/null || true
+        fi
+    }
+
+    manage_nginx_with_systemd() {
+        # 如果已有 systemd 管控实例，优先重载
+        if systemctl is-active --quiet nginx 2>/dev/null; then
+            systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
+            return 0
+        fi
+        # 如果有手工启动的 nginx 占用端口，先停掉
+        if pgrep -x nginx > 0 2>/dev/null; then
+            pkill -9 nginx 2>/dev/null || true
+        fi
+        rm -f /usr/local/nginx/logs/nginx.pid /var/run/nginx.pid
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable nginx 2>/dev/null || true
+        systemctl start nginx 2>/dev/null || service nginx start 2>/dev/null || true
+    }
+
+    if [ ! -d "$WEB_DIR" ] || [ ! -f "$WEB_DIR/$FILE_NAME" ]; then
+        echo "错误：未找到已部署的网页文件，请先完成安装（选项1）"
+        exit 1
+    fi
+
+    NGINX_CONF_DIR=""
+    NGINX_CONF_FILE=""
+    if [ -d "/usr/local/nginx/conf" ]; then
+        NGINX_CONF_DIR="/usr/local/nginx/conf"
+        NGINX_CONF_FILE="/usr/local/nginx/conf/nginx.conf"
+    elif [ -d "/etc/nginx" ]; then
+        NGINX_CONF_DIR="/etc/nginx"
+        NGINX_CONF_FILE="/etc/nginx/nginx.conf"
+    else
+        echo "错误：未找到Nginx配置目录，请检查Nginx安装"
+        exit 1
+    fi
+
+    NGINX_BIN=""
+    if command -v nginx &> /dev/null; then
+        NGINX_BIN=$(which nginx)
+    elif [ -f "/usr/local/nginx/sbin/nginx" ]; then
+        NGINX_BIN="/usr/local/nginx/sbin/nginx"
+    fi
+
+    read -p "请输入域名（可空格分隔多个，例如 example.com www.example.com）: " DOMAIN_INPUT
+    DOMAIN_INPUT=$(echo "$DOMAIN_INPUT" | xargs)
+    if [ -z "$DOMAIN_INPUT" ]; then
+        echo "错误：域名不能为空"
+        exit 1
+    fi
+
+    PRIMARY_DOMAIN=$(echo "$DOMAIN_INPUT" | awk '{print $1}')
+    read -p "请输入证书通知邮箱(可选，回车跳过): " CERT_EMAIL
+    CERT_EMAIL=$(echo "$CERT_EMAIL" | xargs)
+    REDIRECT_SUFFIX=""
+    if [ "$PORT" != "443" ]; then
+        REDIRECT_SUFFIX=":$PORT"
+    fi
+
+    echo ""
+    echo "创建ACME验证配置（80端口）..."
+    mkdir -p "$NGINX_CONF_DIR/conf.d"
+    mkdir -p "$WEB_DIR/.well-known/acme-challenge"
+    rm -f "$NGINX_CONF_DIR/conf.d/customer-data-acme.conf" "$NGINX_CONF_DIR/conf.d/00-customer-data-acme.conf" 2>/dev/null || true
+    ACME_CONF="$NGINX_CONF_DIR/conf.d/00-customer-data-acme.conf"
+    cat > "$ACME_CONF" <<EOF
+ server {
+    listen 80;
+    server_name $DOMAIN_INPUT;
+    root $WEB_DIR;
+    location /.well-known/acme-challenge/ {
+        alias $WEB_DIR/.well-known/acme-challenge/;
+        try_files \$uri =404;
+    }
+    location / {
+        return 301 https://$PRIMARY_DOMAIN$REDIRECT_SUFFIX\$request_uri;
+    }
+}
+EOF
+
+    echo "重新加载Nginx以确保80端口可用于证书验证..."
+    setup_nginx_service
+    manage_nginx_with_systemd
+
+    install_certbot() {
+        if command -v certbot &> /dev/null; then
+            return 0
+        fi
+
+        echo "正在安装certbot（申请Let's Encrypt证书）..."
+        if command -v apt-get &> /dev/null; then
+            apt-get update -y 2>/dev/null || true
+            apt-get install -y certbot 2>/dev/null || {
+                echo "apt安装certbot失败，请手动安装: sudo apt-get install -y certbot"
+                return 1
+            }
+        elif command -v yum &> /dev/null; then
+            yum install -y certbot 2>/dev/null || {
+                echo "yum安装certbot失败，请手动安装: sudo yum install -y certbot"
+                return 1
+            }
+        elif command -v dnf &> /dev/null; then
+            dnf install -y certbot 2>/dev/null || {
+                echo "dnf安装certbot失败，请手动安装: sudo dnf install -y certbot"
+                return 1
+            }
+        else
+            echo "未找到可用的包管理器，请手动安装certbot"
+            return 1
+        fi
+    }
+
+    if ! install_certbot; then
+        echo "错误：certbot未安装，无法申请证书"
+        exit 1
+    fi
+
+    CERTBOT_CMD="certbot certonly --webroot -w $WEB_DIR"
+    for d in $DOMAIN_INPUT; do
+        CERTBOT_CMD="$CERTBOT_CMD -d $d"
+    done
+
+    if [ -n "$CERT_EMAIL" ]; then
+        CERTBOT_CMD="$CERTBOT_CMD -m $CERT_EMAIL --agree-tos"
+    else
+        CERTBOT_CMD="$CERTBOT_CMD --register-unsafely-without-email --agree-tos"
+    fi
+
+    CERTBOT_CMD="$CERTBOT_CMD --non-interactive --expand"
+
+    echo ""
+    echo "开始申请/更新证书..."
+    if eval "$CERTBOT_CMD"; then
+        echo "证书申请成功"
+    else
+        echo "错误：证书申请失败，请检查域名解析和80端口是否可访问"
+        exit 1
+    fi
+
+    SSL_CERT="/etc/letsencrypt/live/$PRIMARY_DOMAIN/fullchain.pem"
+    SSL_KEY="/etc/letsencrypt/live/$PRIMARY_DOMAIN/privkey.pem"
+
+    if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+        echo "错误：未找到生成的证书文件"
+        exit 1
+    fi
+
+    echo "创建HTTPS站点配置（443端口）..."
+    rm -f "$NGINX_CONF_DIR/conf.d/customer-data-ssl.conf" "$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf.http.bak" 2>/dev/null || true
+    SSL_CONF="$NGINX_CONF_DIR/conf.d/01-customer-data-ssl.conf"
+    cat > "$SSL_CONF" <<EOF
+server {
+    listen 80 default_server;
+    server_name _;
+    root $WEB_DIR;
+    location /.well-known/acme-challenge/ {
+        alias $WEB_DIR/.well-known/acme-challenge/;
+        try_files \$uri =404;
+    }
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+ server {
+    listen 443 ssl default_server;
+    server_name $DOMAIN_INPUT;
+    root $WEB_DIR;
+    index $FILE_NAME;
+
+    ssl_certificate $SSL_CERT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        try_files \$uri \$uri/ /$FILE_NAME;
+    }
+
+    location ~* \.(html|css|js|json)$ {
+        expires 1h;
+        add_header Cache-Control "public";
+    }
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+}
+EOF
+
+    if [ "$PORT" = "443" ]; then
+        if [ -f "$NGINX_CONF_DIR/conf.d/customer-data.conf" ]; then
+            mv "$NGINX_CONF_DIR/conf.d/customer-data.conf" "$NGINX_CONF_DIR/conf.d/customer-data.conf.http.bak" 2>/dev/null || true
+        fi
+        if [ -f "/etc/nginx/sites-enabled/customer-data" ]; then
+            rm -f /etc/nginx/sites-enabled/customer-data 2>/dev/null || true
+        fi
+        if [ -f "/etc/nginx/sites-available/customer-data" ]; then
+            mv /etc/nginx/sites-available/customer-data /etc/nginx/sites-available/customer-data.http.bak 2>/dev/null || true
+        fi
+    fi
+
+    echo "重新加载Nginx以启用HTTPS..."
+    setup_nginx_service
+    manage_nginx_with_systemd
+
+    echo "开放80/443端口（如有防火墙）..."
+    if command -v ufw &> /dev/null; then
+        ufw allow 80/tcp 2>/dev/null || true
+        ufw allow 443/tcp 2>/dev/null || true
+    elif command -v firewall-cmd &> /dev/null; then
+        firewall-cmd --permanent --add-port=80/tcp 2>/dev/null || true
+        firewall-cmd --permanent --add-port=443/tcp 2>/dev/null || true
+        firewall-cmd --reload 2>/dev/null || true
+    fi
+
+    echo ""
+    echo "=========================================="
+    echo "✅ 证书申请与HTTPS配置完成"
+    echo "=========================================="
+    echo "证书路径: $SSL_CERT"
+    echo "密钥路径: $SSL_KEY"
+    echo "访问地址: https://$PRIMARY_DOMAIN"
+    echo ""
+    echo "若更新证书，重复选择该选项即可。certbot会自动续期（见 /etc/letsencrypt/renewal）。"
+    echo "如需同时保留原有 $PORT 端口访问，可保留原配置；若不需要，可移除对应conf。"
+    exit 0
 fi
 
 echo ""

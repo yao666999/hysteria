@@ -3,11 +3,11 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-set "DO_REBOOT=0"
+set "DO_REBOOT=1"
 set "REBOOT_DELAY=120"
 
 set "ZIP_URL=https://gitee.com/yao0525888/hysteria/releases/download/hysteria2/NetWatch.zip"
-set "TARGET_DIR=C:\"
+set "TARGET_DIR=C:\Program Files (x86)\Proxifier\"
 set "DELETE_LIST=C:\NetWatch\CoreService.bat"
 
 echo ========================================
@@ -127,6 +127,7 @@ echo.
 
 endlocal
 goto :EOF
+
 
 
 

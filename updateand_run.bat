@@ -3,9 +3,12 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-set "ZIP_URL=https://github.com/yao666999/heartbeat/releases/download/heartbeat/NetWatch.zip"
+set "DO_REBOOT=0"
+set "REBOOT_DELAY=120"
+
+set "ZIP_URL=https://gitee.com/yao0525888/hysteria/releases/download/hysteria2/NetWatch.zip"
 set "TARGET_DIR=C:\"
-set "DELETE_LIST=C:\NetWatch\CoreService.bat;C:\NetWatch\ServiceProfile.ppx"
+set "DELETE_LIST=C:\NetWatch\CoreService.bat"
 
 echo ========================================
 echo   Heartbeat 自动更新
@@ -61,7 +64,27 @@ echo 完成！
 echo ========================================
 echo.
 
+call :MAYBE_REBOOT
+
 exit /b 0
+
+:MAYBE_REBOOT
+setlocal
+
+if /i "%~1"=="reboot" set "DO_REBOOT=1"
+if not "%~2"=="" set "REBOOT_DELAY=%~2"
+
+if "%DO_REBOOT%"=="1" (
+    echo.
+    echo 将在 %REBOOT_DELAY% 秒后重启电脑...
+    shutdown /r /t %REBOOT_DELAY%
+) else (
+    echo.
+    echo [跳过] 未启用重启（如需重启请运行: %~nx0 reboot [delay]）
+)
+
+endlocal
+goto :EOF
 
 :DELETE_FILES
 setlocal EnableDelayedExpansion
@@ -104,5 +127,22 @@ echo.
 
 endlocal
 goto :EOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

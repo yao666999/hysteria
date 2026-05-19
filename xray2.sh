@@ -249,6 +249,11 @@ install_all_services() {
                 local url_fixed
                 url_fixed=$(echo "$url" | sed -E "s/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/${fixed_uuid}/g")
                 echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
+                echo -e "${YELLOW}IP:${NC} ${LIGHT_GREEN}${client_ip}${NC}"
+                local xray_port=$(echo "$url_fixed" | awk -F'[@?]' '{print $2}' | awk -F':' '{print $NF}')
+                if [[ "$xray_port" =~ ^[0-9]+$ ]]; then
+                    echo -e "${YELLOW}端口:${NC} ${LIGHT_GREEN}${xray_port}${NC}"
+                fi
             else
                 echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
             fi

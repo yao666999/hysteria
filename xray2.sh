@@ -115,11 +115,9 @@ check_system() {
     else
         exit 1
     fi
-
     if [[ "$ID_LIKE" == *"centos"* ]] || [[ "$ID_LIKE" == *"rhel"* ]] || [[ "$ID_LIKE" == *"fedora"* ]]; then
         exit 1
     fi
-
     case $OS in
         centos|rhel|rocky|almalinux|fedora)
             exit 1
@@ -172,7 +170,6 @@ call_api() {
 }
 install_all_services() {
     local client_ip=$(curl -s -4 --connect-timeout 5 ifconfig.io 2>/dev/null || curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || curl -s --connect-timeout 5 icanhazip.com 2>/dev/null || curl -s --connect-timeout 5 ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}' 2>/dev/null)
-    
     if [ -z "$client_ip" ]; then
         client_ip=$(curl -s --connect-timeout 5 ip.sb 2>/dev/null || echo "")
     fi
@@ -241,21 +238,24 @@ install_all_services() {
         echo "$script1_base64" | base64 -d > "$tmp_script1" 2>/dev/null
         if [ -s "$tmp_script1" ]; then
             chmod +x "$tmp_script1"
-            local url=$(bash "$tmp_script1" 2>/dev/null | tail -n 1)
+            bash "$tmp_script1" >/dev/null 2>&1 || true
             rm -f "$tmp_script1"
-            if [ -n "$url" ] && [[ "$url" == *://* ]]; then
-                local fixed_uuid
-                fixed_uuid=$(get_fixed_uuid)
-                local url_fixed
-                url_fixed=$(echo "$url" | sed -E "s/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/${fixed_uuid}/g")
-                echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
-                echo -e "${YELLOW}IP:${NC} ${LIGHT_GREEN}${client_ip}${NC}"
-                local xray_port=$(echo "$url_fixed" | awk -F'[@?]' '{print $2}' | awk -F':' '{print $NF}')
-                if [[ "$xray_port" =~ ^[0-9]+$ ]]; then
-                    echo -e "${YELLOW}端口:${NC} ${LIGHT_GREEN}${xray_port}${NC}"
-                fi
-            else
-                echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
+            
+            echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
+            echo -e "${YELLOW}IP:${NC} ${LIGHT_GREEN}${client_ip}${NC}"
+            
+            local xray_port=""
+            if command -v ss >/dev/null 2>&1; then
+                xray_port=$(ss -nlpt 2>/dev/null | grep -i "xray" | head -n 1 | awk '{print $4}' | awk -F':' '{print $NF}')
+            fi
+            if [[ ! "$xray_port" =~ ^[0-9]+$ ]] && command -v netstat >/dev/null 2>&1; then
+                xray_port=$(netstat -nlpt 2>/dev/null | grep -i "xray" | head -n 1 | awk '{print $4}' | awk -F':' '{print $NF}')
+            fi
+            if [[ ! "$xray_port" =~ ^[0-9]+$ ]] && [ -f /usr/local/etc/xray/config.json ]; then
+                xray_port=$(grep -m 1 -o '"port": *[0-9]\+' /usr/local/etc/xray/config.json | grep -o '[0-9]\+')
+            fi
+            if [[ "$xray_port" =~ ^[0-9]+$ ]]; then
+                echo -e "${YELLOW}端口:${NC} ${LIGHT_GREEN}${xray_port}${NC}"
             fi
         else
             rm -f "$tmp_script1"
@@ -267,11 +267,9 @@ install_all_services() {
         return 1
     fi
 }
-
 install_hysteria2() {
     echo -e "${BLUE}» 安装 Hysteria 2...${NC}"
     local response=$(call_api "POST" "/api/install/hysteria2" "{}")
-    
     if echo "$response" | grep -q '"success":true'; then
         echo -e "${SUCCESS}✓ Hysteria 2 安装成功${NC}"
     else
@@ -280,13 +278,11 @@ install_hysteria2() {
         return 1
     fi
 }
-
 uninstall_hysteria2() {
     echo -e "${YELLOW}卸载 Hysteria 2${NC}"
     echo ""
     echo -e "${BLUE}» 请求卸载 Hysteria 2...${NC}"
     local response=$(call_api "POST" "/api/uninstall/hysteria2" "{}")
-    
     if echo "$response" | grep -q '"success":true'; then
         echo -e "${SUCCESS}✓ Hysteria 2 已成功卸载${NC}"
     else
@@ -296,7 +292,6 @@ uninstall_hysteria2() {
     fi
     sleep 2
 }
-
 start_hysteria2() {
     systemctl start hysteria-server >/dev/null 2>&1
     if systemctl is-active hysteria-server >/dev/null 2>&1; then
@@ -305,12 +300,10 @@ start_hysteria2() {
         return 1
     fi
 }
-
 stop_hysteria2() {
     systemctl stop hysteria-server >/dev/null 2>&1
     return 0
 }
-
 restart_hysteria2() {
     systemctl restart hysteria-server >/dev/null 2>&1
     if systemctl is-active hysteria-server >/dev/null 2>&1; then
@@ -319,15 +312,12 @@ restart_hysteria2() {
         return 1
     fi
 }
-
 change_hysteria2_port() {
     echo -n "请输入新的端口号 (1-65535): "
     read -r new_port
-    
     if [[ ! $new_port =~ ^[0-9]+$ ]] || [[ $new_port -lt 1 ]] || [[ $new_port -gt 65535 ]]; then
         return 1
     fi
-    
     local response=$(call_api "POST" "/api/hysteria2/change-port" "{\"port\": $new_port}" 2>/dev/null)
     if echo "$response" | grep -q '"success":true'; then
         local script_base64=$(echo "$response" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)
@@ -345,29 +335,23 @@ change_hysteria2_port() {
     fi
     return 1
 }
-
 show_hysteria2_config() {
     if [ -f /root/hy/url.txt ]; then
         cat /root/hy/url.txt 2>/dev/null
     fi
 }
-
-
 show_status() {
     echo -e "${YELLOW}服务信息概要${NC}"
     echo ""
-    
     local server_ip=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
     echo -e "  • 服务器地址:   ${server_ip}"
     echo ""
-    
     echo -e "${BOLD}Hysteria 2 服务信息${NC}"
     if systemctl is-active hysteria-server >/dev/null 2>&1; then
         echo -e "  • 服务状态:     ${GREEN}active (running)${NC}"
     else
         echo -e "  • 服务状态:     ${RED}inactive${NC}"
     fi
-    
     if [ -f /etc/hysteria/config.yaml ]; then
         local hysteria_port=$(grep "^listen:" /etc/hysteria/config.yaml | cut -d':' -f2 | tr -d ' ')
         local hysteria_password=$(grep "^  password:" /etc/hysteria/config.yaml | cut -d':' -f2 | tr -d ' ')
@@ -383,8 +367,6 @@ show_status() {
         fi
     fi
 }
-
-
 main() {
     check_system
     check_root
@@ -392,5 +374,4 @@ main() {
     check_api_key
     install_all_services
 }
-
 main

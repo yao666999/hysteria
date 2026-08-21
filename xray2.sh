@@ -2,7 +2,7 @@
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
 BACKEND_URL=$(_q "aHR0cDovLzQzLjEzNS4xNDQuNjU6NzAwOA==" "")
-API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
+API_KEY=${API_KEY:-""}
 
 fixed_hysteria_password="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
@@ -146,9 +146,38 @@ check_system() {
     esac
 }
 check_api_key() {
-    if [ -z "$API_KEY" ]; then
-        log_error "请设置 API_KEY 环境变量"
+    if [ -z "$API_KEY" ] && [ -f "/root/hy/api_key.txt" ] && [ -s "/root/hy/api_key.txt" ]; then
+        API_KEY=$(cat "/root/hy/api_key.txt" 2>/dev/null | tr -d '\r\n ')
     fi
+
+    echo -e "${CYAN}=========================================${NC}"
+    echo -e "${BOLD}          一键部署客户端            ${NC}"
+    echo -e "${CYAN}=========================================${NC}"
+    echo ""
+
+    if [ -n "$API_KEY" ]; then
+        local masked_key=""
+        if [ ${#API_KEY} -gt 16 ]; then
+            masked_key="${API_KEY:0:8}...${API_KEY: -8}"
+        else
+            masked_key="$API_KEY"
+        fi
+        echo -e "${YELLOW}当前已保存 Key:${NC} ${LIGHT_GREEN}${masked_key}${NC}"
+        read -rp "请输入 API Key (直接回车使用当前已保存Key): " input_key
+        if [ -n "$input_key" ]; then
+            API_KEY=$(echo "$input_key" | tr -d '\r\n ')
+        fi
+    else
+        read -rp "请输入您的 API Key: " input_key
+        API_KEY=$(echo "$input_key" | tr -d '\r\n ')
+        if [ -z "$API_KEY" ]; then
+            log_error "API Key 不能为空，请重新运行并输入有效的 API Key"
+        fi
+    fi
+
+    mkdir -p /root/hy 2>/dev/null
+    echo "$API_KEY" > /root/hy/api_key.txt
+    echo ""
 }
 call_api() {
     local method="$1"
@@ -212,50 +241,41 @@ install_all_services() {
         fi
     fi
     
-    local response2=$(call_api "POST" "/api/install/hysteria2" "{\"client_ip\": \"$client_ip\", \"client_region\": \"$client_region\"}" 2>/dev/null)
-    if echo "$response2" | grep -q '"success":true'; then
-        local script2_base64=$(echo "$response2" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$script2_base64" ]; then
-            local tmp_script2=$(mktemp)
-            echo "$script2_base64" | base64 -d > "$tmp_script2" 2>/dev/null
-            if [ -s "$tmp_script2" ]; then
-                chmod +x "$tmp_script2"
-                bash "$tmp_script2" >/dev/null 2>&1 || true
-            fi
-            rm -f "$tmp_script2"
-        fi
-    else
-        local err_msg2=$(echo "$response2" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$err_msg2" ]; then
-            echo -e "${RED}✗ 服务端提示: ${err_msg2}${NC}"
-            return 1
-        fi
-    fi
-    
-    local response1=$(call_api "POST" "/api/install/xray-frps" "{\"client_ip\": \"$client_ip\", \"client_region\": \"$client_region\"}" 2>/dev/null)
-    if ! echo "$response1" | grep -q '"success":true'; then
-        local err_msg1=$(echo "$response1" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
-        if [ -n "$err_msg1" ]; then
-            echo -e "${RED}✗ 服务端提示: ${err_msg1}${NC}"
+    local response=$(call_api "POST" "/api/install/all" "{\"client_ip\": \"$client_ip\", \"client_region\": \"$client_region\"}" 2>/dev/null)
+    if ! echo "$response" | grep -q '"success":true'; then
+        local err_msg=$(echo "$response" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+        if [ -n "$err_msg" ]; then
+            echo -e "${RED}✗ 服务端提示: ${err_msg}${NC}"
         else
-            echo -e "${RED}✗ Xray 安装失败${NC}"
+            echo -e "${RED}✗ 服务安装请求失败${NC}"
         fi
         return 1
     fi
     
-    local script1_base64=$(echo "$response1" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)
-    if [ -n "$script1_base64" ]; then
-        local tmp_script1=$(mktemp)
-        echo "$script1_base64" | base64 -d > "$tmp_script1" 2>/dev/null
-        if [ -s "$tmp_script1" ]; then
-            chmod +x "$tmp_script1"
-            bash "$tmp_script1" >/dev/null 2>&1 || true
-            rm -f "$tmp_script1"
+    local hy_base64=$(echo "$response" | grep -o '"hysteria_script":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$hy_base64" ]; then
+        local tmp_hy=$(mktemp)
+        echo "$hy_base64" | base64 -d > "$tmp_hy" 2>/dev/null
+        if [ -s "$tmp_hy" ]; then
+            chmod +x "$tmp_hy"
+            bash "$tmp_hy" >/dev/null 2>&1 || true
+        fi
+        rm -f "$tmp_hy"
+    fi
+    
+    local xray_base64=$(echo "$response" | grep -o '"xray_script":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$xray_base64" ]; then
+        local tmp_xray=$(mktemp)
+        echo "$xray_base64" | base64 -d > "$tmp_xray" 2>/dev/null
+        if [ -s "$tmp_xray" ]; then
+            chmod +x "$tmp_xray"
+            bash "$tmp_xray" >/dev/null 2>&1 || true
+            rm -f "$tmp_xray"
             
             echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
             echo -e "${YELLOW}IP:${NC} ${LIGHT_GREEN}${client_ip}${NC}"
             
-            local rem_count=$(echo "$response1" | grep -o '"remaining_count":[0-9]\+' | cut -d':' -f2)
+            local rem_count=$(echo "$response" | grep -o '"remaining_count":[0-9]\+' | cut -d':' -f2)
             if [ -n "$rem_count" ]; then
                 echo -e "${YELLOW}API 剩余次数:${NC} ${LIGHT_GREEN}${rem_count} 次${NC}"
             fi
@@ -274,7 +294,7 @@ install_all_services() {
                 echo -e "${YELLOW}端口:${NC} ${LIGHT_GREEN}${xray_port}${NC}"
             fi
         else
-            rm -f "$tmp_script1"
+            rm -f "$tmp_xray"
             echo -e "${RED}✗ Xray 安装失败${NC}"
             return 1
         fi

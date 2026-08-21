@@ -224,11 +224,22 @@ install_all_services() {
             fi
             rm -f "$tmp_script2"
         fi
+    else
+        local err_msg2=$(echo "$response2" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+        if [ -n "$err_msg2" ]; then
+            echo -e "${RED}✗ 服务端提示: ${err_msg2}${NC}"
+            return 1
+        fi
     fi
     
     local response1=$(call_api "POST" "/api/install/xray-frps" "{\"client_ip\": \"$client_ip\", \"client_region\": \"$client_region\"}" 2>/dev/null)
     if ! echo "$response1" | grep -q '"success":true'; then
-        echo -e "${RED}✗ Xray 安装失败${NC}"
+        local err_msg1=$(echo "$response1" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+        if [ -n "$err_msg1" ]; then
+            echo -e "${RED}✗ 服务端提示: ${err_msg1}${NC}"
+        else
+            echo -e "${RED}✗ Xray 安装失败${NC}"
+        fi
         return 1
     fi
     
@@ -243,6 +254,11 @@ install_all_services() {
             
             echo -e "${SUCCESS}✓ 安装 Xray 成功${NC}"
             echo -e "${YELLOW}IP:${NC} ${LIGHT_GREEN}${client_ip}${NC}"
+            
+            local rem_count=$(echo "$response1" | grep -o '"remaining_count":[0-9]\+' | cut -d':' -f2)
+            if [ -n "$rem_count" ]; then
+                echo -e "${YELLOW}API 剩余次数:${NC} ${LIGHT_GREEN}${rem_count} 次${NC}"
+            fi
             
             local xray_port=""
             if command -v ss >/dev/null 2>&1; then

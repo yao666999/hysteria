@@ -6,6 +6,7 @@ API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNj
 
 fixed_hysteria_password="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"
+fixed_pin_sha256="ba515ecab2b16e232f66d7f504415833f3669605c4c416f957906156e75e8cd6"
 
 LIGHT_GREEN='\033[1;32m'
 GREEN='\033[0;32m'
@@ -64,6 +65,73 @@ get_fixed_hysteria_password() {
     fi
     echo "$pwd" > "$file"
     echo "$pwd"
+}
+get_fixed_pin_sha256() {
+    local file="/root/hy/fixed_pin_sha256.txt"
+    if [ -n "$fixed_pin_sha256" ]; then
+        echo "$fixed_pin_sha256"
+        return 0
+    fi
+    if [ -f "$file" ] && [ -s "$file" ]; then
+        cat "$file"
+        return 0
+    fi
+    return 1
+}
+format_hysteria_url() {
+    local raw_url="$1"
+    local fixed_pass
+    fixed_pass=$(get_fixed_hysteria_password)
+    local fixed_pin
+    fixed_pin=$(get_fixed_pin_sha256 2>/dev/null)
+    
+    if [ -z "$raw_url" ]; then
+        echo ""
+        return 1
+    fi
+    
+    local res="$raw_url"
+    if [ -n "$fixed_pass" ]; then
+        res=$(echo "$res" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+    fi
+    
+    if [ -n "$fixed_pin" ]; then
+        if echo "$res" | grep -q "pinSHA256="; then
+            res=$(echo "$res" | sed -E "s#pinSHA256=[^&#]*#pinSHA256=${fixed_pin}#")
+        elif echo "$res" | grep -q "#"; then
+            local base_part="${res%%#*}"
+            local frag_part="${res#*#}"
+            if echo "$base_part" | grep -q "\?"; then
+                if [[ "$base_part" == *\? ]]; then
+                    res="${base_part}pinSHA256=${fixed_pin}#${frag_part}"
+                else
+                    res="${base_part}&pinSHA256=${fixed_pin}#${frag_part}"
+                fi
+            else
+                if [[ "$base_part" == */ ]]; then
+                    res="${base_part}?pinSHA256=${fixed_pin}#${frag_part}"
+                else
+                    res="${base_part}/?pinSHA256=${fixed_pin}#${frag_part}"
+                fi
+            fi
+        else
+            if echo "$res" | grep -q "\?"; then
+                if [[ "$res" == *\? ]]; then
+                    res="${res}pinSHA256=${fixed_pin}"
+                else
+                    res="${res}&pinSHA256=${fixed_pin}"
+                fi
+            else
+                if [[ "$res" == */ ]]; then
+                    res="${res}?pinSHA256=${fixed_pin}"
+                else
+                    res="${res}/?pinSHA256=${fixed_pin}"
+                fi
+            fi
+        fi
+    fi
+    
+    echo "$res"
 }
 ensure_curl() {
     if command -v curl >/dev/null 2>&1; then
@@ -245,10 +313,10 @@ install_all_services() {
             local url=$(bash "$tmp_script2" 2>/dev/null | tail -n 1)
             rm -f "$tmp_script2"
             if [ -n "$url" ] && [[ "$url" == hysteria2://* ]]; then
-                local fixed_pass
-                fixed_pass=$(get_fixed_hysteria_password)
                 local url_fixed
-                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+                url_fixed=$(format_hysteria_url "$url")
+                mkdir -p /root/hy 2>/dev/null
+                echo "$url_fixed" > /root/hy/url.txt 2>/dev/null
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
@@ -256,10 +324,9 @@ install_all_services() {
             else
                 if [ -f /root/hy/url.txt ]; then
                     local url=$(cat /root/hy/url.txt 2>/dev/null)
-                    local fixed_pass
-                    fixed_pass=$(get_fixed_hysteria_password)
                     local url_fixed
-                    url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+                    url_fixed=$(format_hysteria_url "$url")
+                    echo "$url_fixed" > /root/hy/url.txt 2>/dev/null
                     echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                     echo ""
                     echo -e "${YELLOW}分享链接:${NC}"
@@ -273,10 +340,9 @@ install_all_services() {
             rm -f "$tmp_script2"
             if [ -f /root/hy/url.txt ]; then
                 local url=$(cat /root/hy/url.txt 2>/dev/null)
-                local fixed_pass
-                fixed_pass=$(get_fixed_hysteria_password)
                 local url_fixed
-                url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+                url_fixed=$(format_hysteria_url "$url")
+                echo "$url_fixed" > /root/hy/url.txt 2>/dev/null
                 echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
                 echo ""
                 echo -e "${YELLOW}分享链接:${NC}"
@@ -289,10 +355,9 @@ install_all_services() {
     else
         if [ -f /root/hy/url.txt ]; then
             local url=$(cat /root/hy/url.txt 2>/dev/null)
-            local fixed_pass
-            fixed_pass=$(get_fixed_hysteria_password)
             local url_fixed
-            url_fixed=$(echo "$url" | sed -E "s#^(hysteria2://)[^@]*(@)#\1${fixed_pass}\2#")
+            url_fixed=$(format_hysteria_url "$url")
+            echo "$url_fixed" > /root/hy/url.txt 2>/dev/null
             echo -e "${SUCCESS}✓ 安装 Hysteria 2 成功${NC}"
             echo ""
             echo -e "${YELLOW}分享链接:${NC}"
@@ -384,7 +449,8 @@ change_hysteria2_port() {
 
 show_hysteria2_config() {
     if [ -f /root/hy/url.txt ]; then
-        cat /root/hy/url.txt 2>/dev/null
+        local url=$(cat /root/hy/url.txt 2>/dev/null)
+        format_hysteria_url "$url"
     fi
 }
 
@@ -416,6 +482,13 @@ show_status() {
         fi
         if [ -n "$masquerade_host" ]; then
             echo -e "  • 伪装网站:      ${masquerade_host}"
+        fi
+    fi
+    if [ -f /root/hy/url.txt ]; then
+        local url=$(cat /root/hy/url.txt 2>/dev/null)
+        local url_fixed=$(format_hysteria_url "$url")
+        if [ -n "$url_fixed" ]; then
+            echo -e "  • 分享链接:      ${LIGHT_GREEN}${url_fixed}${NC}"
         fi
     fi
 }

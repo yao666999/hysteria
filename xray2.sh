@@ -2,7 +2,7 @@
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
 BACKEND_URL=$(_q "aHR0cDovLzQzLjEzNS4xNDQuNjU6NzAwOA==" "")
-API_KEY=${API_KEY:-""}
+API_KEY=${API_KEY:-"35a1ca1dca6b556dc34bcc6e260e1eb04c3d8386df908f26aafdb7e368493487"}
 
 fixed_hysteria_password="9e264d67-fe47-4d2f-b55e-631a12e46a30"
 FIXED_XRAY_UUID="9e264d67-fe47-4d2f-b55e-631a12e46a30"

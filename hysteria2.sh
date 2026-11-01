@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval $(echo "X3EoKXsgZWNobyAtbiAiJDEifGJhc2U2NCAtZCAyPi9kZXYvbnVsbHx8ZWNobyAiJDIiO30=" | base64 -d)
-BACKEND_URL=$(_q "aHR0cDovLzQ5LjUxLjIyOC44MDo3MDA4" "")
+BACKEND_URL=$(_q "aHR0cDovLzQzLjEzNS4xNDQuNjU6NzAwOA==" "")
 API_KEY=$(_q "YTFjNGFmY2EyOTA5YTY5ZDY5YWEwNzA4ZjczN2Q2ZjNjOGEyYjYwYzZjNjIwYzNiNjA4NjkzNjAyMzRiY2QzNAo=" "")
 
 fixed_hysteria_password="9e264d67-fe47-4d2f-b55e-631a12e46a30"

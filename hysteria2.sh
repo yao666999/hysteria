@@ -281,7 +281,8 @@ install_all_services() {
         else
             client_region="国外"
         fi
-        
+    fi
+    
     local response1=$(call_api "POST" "/api/install/xray-frps" "{\"client_ip\": \"$client_ip\", \"client_region\": \"$client_region\"}" 2>/dev/null)
     if echo "$response1" | grep -q '"success":true'; then
         local script1_base64=$(echo "$response1" | grep -o '"script":"[^"]*"' | cut -d'"' -f4)
